@@ -124,12 +124,8 @@ CMD_FUNC(cmd_protoctl)
 			 */
 			if (strstr(charsys_get_current_languages(), "utf8") && !strstr(value, "utf8"))
 			{
-				char buf[512];
-				snprintf(buf, sizeof(buf), "Server %s has utf8 in set::allowed-nickchars but %s does not. Link rejected.",
+				sendto_realops("\002WARNING!!!!\002 Server %s has utf8 in set::allowed-nickchars but %s does not. Proceed with caution.",
 					me.name, *client->name ? client->name : "other side");
-				sendto_realops("\002ERROR\001 %s", buf);
-				exit_client(client, NULL, buf);
-				return;
 			}
 			/* We compare the character sets to see if we should warn opers about any mismatch... */
 			if (strcmp(value, charsys_get_current_languages()))
