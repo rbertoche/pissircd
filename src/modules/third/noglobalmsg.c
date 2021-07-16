@@ -1,11 +1,11 @@
 /*
- *   IRC - Internet Relay Chat, src/modules/third/pissnet_relink.c
+ *   IRC - Internet Relay Chat, src/modules/third/noglobalmsg.c
  *   (C) 2021 Polsaker - All rights reserved.
  *
  *   You are granted unlimited and unrestricted rights to use, modify 
  *   and redistribute the licensed work, pursuant to the following terms:
  *   1. You must piss
- *   2. You are required to say "Fuck You MemoServ/Noisytoot" in #opers on pissnet.
+ *   2. It must be more than 100ml.
  */
 
 #include "unrealircd.h"
