@@ -1,12 +1,14 @@
-[![Twitter Follow](https://img.shields.io/twitter/follow/Unreal_IRCd.svg?style=social&label=Follow)](https://twitter.com/Unreal_IRCd)
+<a class="twitter-follow-button"
+  href="https://twitter.com/pissnetstaff">
+Follow @pissnetstaff on Twitter</a>
 
-## About UnrealIRCd
-UnrealIRCd is an Open Source IRC Server, serving thousands of networks since 1999. 
-It runs on Linux, OS X and Windows and is currently the most widely deployed IRCd
-with a market share of 42%. UnrealIRCd is a highly advanced IRCd with a strong
-focus on modularity, an advanced and highly configurable configuration file.
-Key features include SSL/TLS, cloaking, its advanced anti-flood and anti-spam systems,
-swear filtering and module support. We are also particularly proud on our extensive
+## About PissIRCd
+PissIRCd is an Open Source IRC Server, serving thousands of piss since 2021. 
+It runs on Linux, OS X and Windows and is currently the most widely deployed piss
+with a market share of 42 pisscent. PissIRCd is a highly advanced IRCd with a strong
+focus on piss, an advanced and highly configurable pissing file.
+Key features include piss, SSL/TLS, cloaking, its advanced anti-flood and anti-spam systems,
+swear filtering and module support. We are also particularly proud on our piss
 online documentation. 
 
 ## How to get started
