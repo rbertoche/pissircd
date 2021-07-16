@@ -7,8 +7,8 @@ PissIRCd (a fork of UnrealIRCd) is an Open Source IRC Server, serving thousands 
 It runs on Linux, OS X and Windows and is currently the most widely deployed piss
 with a market share of 42 pisscent. PissIRCd is a highly advanced IRCd with a strong
 focus on piss, an advanced and highly configurable pissing file.
-Key features include piss, SSL/TLS, cloaking, its advanced anti-flood and anti-spam systems,
-swear filtering and module support. We are also particularly proud on our piss
+Key features include piss, SSL/TLS, cloaking, its advanced anti-flood and anti-piss systems,
+piss filtering and module support. We are also particularly proud on our piss
 online documentation. 
 
 ## How to get started
