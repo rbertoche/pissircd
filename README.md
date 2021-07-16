@@ -3,7 +3,7 @@
 Follow @pissnetstaff on Twitter</a>
 
 ## About PissIRCd
-PissIRCd is an Open Source IRC Server, serving thousands of piss since 2021. 
+PissIRCd (a fork of UnrealIRCd) is an Open Source IRC Server, serving thousands of piss since 2021. 
 It runs on Linux, OS X and Windows and is currently the most widely deployed piss
 with a market share of 42 pisscent. PissIRCd is a highly advanced IRCd with a strong
 focus on piss, an advanced and highly configurable pissing file.
@@ -48,13 +48,11 @@ Run `./unrealircd start` in the directory where you installed UnrealIRCd.
 #### Windows
 Start -> All Programs -> UnrealIRCd -> UnrealIRCd
 
-## Documentation & FAQ
+## Documentation & FAQ for UnrealIRCd
 You can find the **documentation** online at: https://www.unrealircd.org/docs/
 
 We also have a good **FAQ**: https://www.unrealircd.org/docs/FAQ
 
 ## Website, support, and other links ##
-* https://www.unrealircd.org - Our main website
-* https://forums.unrealircd.org - Support
-* https://bugs.unrealircd.org - Bug tracker
-* ircs://irc.unrealircd.org:6697/unreal-support - IRC support
+* https://letspiss.net/ - Our main IRC website that inspired PissIRCd
+* https://wiki.letspiss.net/ - Wiki
