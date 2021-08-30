@@ -46,7 +46,7 @@ console.log(String.fromCharCode(...codePoints))
 // TODO: Integrate with figlet
 console.log("------------------------------------------------------------")
 console.log("To create a logo: 'figlet -f big <message> > new_logo.txt'")
-console.log("                  'node logo_tool.js'")
+console.log("                  'node extras/logotool.js'")
 console.log("\nClose enough! :tm:")
 console.log("------------------------------------------------------------")
 console.log("Loading new logo from new_logo.txt")
