@@ -51,7 +51,7 @@ console.log("\nClose enough! :tm:")
 console.log("------------------------------------------------------------")
 console.log("Loading new logo from new_logo.txt")
 
-const newLogo = fs.readFileSync("orig_logo.txt")
+const newLogo = fs.readFileSync("new_logo.txt")
 
 let keys = []
 newLogo.forEach(l => keys.push(l))
@@ -76,7 +76,10 @@ console.log("------------------------------------------------------------")
 
 
 // Regex to remove instances of blank lines (as defined above)
-keys2 = keys.toString().replace(/((,32){56},10){1,}/gm, "").split(",")
+
+// bugfix: 56x for the default "UnrealIRCd logo", but custom logos have different widths
+//         using 2+ spaces in a row followed by newline for now.
+keys2 = keys.toString().replace(/((,32){2,},10){1,}/gm, "").split(",")
 
 // If last item is a 10 (newline), remove it
 // bugfix: try commenting this out since ircd places the git string on the same line as the chars
