@@ -79,7 +79,9 @@ console.log("------------------------------------------------------------")
 keys2 = keys.toString().replace(/((,32){56},10){1,}/gm, "").split(",")
 
 // If last item is a 10 (newline), remove it
-if (keys2[keys2.length-1] = "10") keys2.pop()
+// bugfix: try commenting this out since ircd places the git string on the same line as the chars
+//         (should be on it's own n)
+//if (keys2[keys2.length-1] = "10") keys2.pop()
 
 
 /*
@@ -126,7 +128,10 @@ for (row = 0; row < rows; row++) {
     // Get the first 11 items from keys2
     for (i = 0; i < 11; i++) {
         //console.log("(debug) Getting item " + i)
-        rowData.push(keys2.shift())
+        const charcode = keys2.shift()
+
+        // Only push if chars are available (otherwise we get undefined elements in rowData)
+        charcode ? rowData.push(charcode) : "skip; no elements left"
 
     }
 
