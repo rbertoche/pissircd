@@ -1,6 +1,15 @@
+// logotool.js
+// Reconstruct src/version.c.SH with the logo banner of your choice!
+// Hacked together by owo on pissnet <https://github.com/Prouser123>
+// To create a logo: 'figlet -f big <message> > new_logo.txt'
+//                   'node extras/logotool.js'
+
 const fs = require("fs")
 
+// Load in the source file
 const scriptFile = fs.readFileSync("src/version.c.SH")
+
+// Step 0: Figure out where the logo definition is
 
 const start = scriptFile.indexOf("char unreallogo[]")
 // -2 to get rid of the two newlines before this match
@@ -108,7 +117,7 @@ console.log("------------------------------------------------------------")
 const fileBeforeDef = scriptFile.slice(0, start)
 const fileAfterDef = scriptFile.slice(end, scriptFile.length)
 
-fs.writeFileSync("test.txt", `${fileBeforeDef}${fileAfterDef}`)
+// debug file outputs disabled | fs.writeFileSync("test.txt", `${fileBeforeDef}${fileAfterDef}`)
 
 // Step 4.1 - Prepare for creation of new logo definition
 //            (See line 20) We ideally want to match tbe format of 11 ascii points per line
@@ -165,7 +174,6 @@ ${stringRows.join("\n")}};\n`
 //console.log(newLogoDef)
 
 // Step 4.4 - Write the new file
-
-// Make a backup of the old file first!
-fs.writeFileSync("src/version.c.SH.original", scriptFile)
 fs.writeFileSync("src/version.c.SH", `${fileBeforeDef}${newLogoDef}${fileAfterDef}`)
+
+// debug file outputs disabled | fs.writeFileSync("src/version.c.SH.original", scriptFile)
