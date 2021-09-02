@@ -755,8 +755,9 @@ skip_host_check:
 		} else
 		if (link->auth->type == AUTHTYPE_SPKIFP)
 		{
-			sendto_ops_and_log("Link denied for '%s' (Authentication failed [spkifp mismatch]) %s",
-				servername, inpath);
+			char *fp = spki_fingerprint(client);
+			sendto_ops_and_log("Link denied for '%s' (Authentication failed [spkifp mismatch (Expected: %s. Got: %s)]) %s",
+				servername, link->auth->data, fp, inpath);
 		} else
 		if (link->auth->type == AUTHTYPE_TLS_CLIENTCERT)
 		{
