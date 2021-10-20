@@ -6352,7 +6352,7 @@ _ACEOF
 else
 
 cat >>confdefs.h <<_ACEOF
-#define DATADIR "$HOME/unrealircd/data"
+#define PERMDATADIR "$HOME/unrealircd/data"
 _ACEOF
 
 		PERMDATADIR="$HOME/unrealircd/data"
