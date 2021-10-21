@@ -601,8 +601,9 @@ cd $cur_dir
 dnl Use system argon2 when available, unless --without-system-argon2
 has_system_argon2="no"
 AS_IF([test "x$with_system_argon2" = "xyes"],[
-PKG_CHECK_MODULES([ARGON2], [libargon2 >= 0~20161029 || libargon2 = ZERO],[has_system_argon2=yes
-AS_IF([test "x$PRIVATELIBDIR" != "x"], [rm -f "$PRIVATELIBDIR/"libargon2*])],[has_system_argon2=no])])
+PKG_CHECK_MODULES([ARGON2], [libargon2 >= 0~20161029],[has_system_argon2=yes],[
+PKG_CHECK_MODULES([ARGON2], [libargon2 = ZERO],[has_system_argon2=yes],[
+AS_IF([test "x$PRIVATELIBDIR" != "x"], [rm -f "$PRIVATELIBDIR/"libargon2*])])])])
 
 AS_IF([test "$has_system_argon2" = "no"],[
 dnl REMEMBER TO CHANGE WITH A NEW ARGON2 RELEASE!
