@@ -82,6 +82,7 @@ char langsinuse[4096];
 #define LANGAV_CYRILLIC_UTF8		0x008000 /* UTF8: cyrillic script */
 #define LANGAV_GREEK_UTF8		0x010000 /* UTF8: greek script */
 #define LANGAV_HEBREW_UTF8		0x020000 /* UTF8: hebrew script */
+#define LANGAV_ARABIC_UTF8		0x040000 /* UTF8: arabic script */
 typedef struct LangList LangList;
 struct LangList
 {
@@ -93,6 +94,7 @@ struct LangList
 /* MUST be alphabetized (first column) */
 static LangList langlist[] = {
 /*	{ "arabic",       "ara", LANGAV_ASCII|LANGAV_ISO8859_6 }, -- TODO: check if this has issues first! */
+	{ "arabic-utf8", "ara-utf8", LANGAV_ASCII|LANGAV_UTF8|LANGAV_ARABIC_UTF8 },
 	{ "belarussian-utf8", "blr-utf8", LANGAV_ASCII|LANGAV_UTF8|LANGAV_CYRILLIC_UTF8 },
 	{ "belarussian-w1251", "blr", LANGAV_ASCII|LANGAV_W1251 },
 	{ "catalan",      "cat", LANGAV_ASCII|LANGAV_LATIN1 },
@@ -323,6 +325,8 @@ int charsys_config_posttest(int *errs)
 	    x++;
 	if (x > 1)
 	{
+#if 0
+// I don't think this should be hard error, right? Some combinations may be problematic, but not all.
 		if (langav & LANGAV_LATIN_UTF8)
 		{
 			config_error("ERROR: set::allowed-nickchars: you cannot combine 'latin-utf8' with any other character set");
@@ -343,8 +347,13 @@ int charsys_config_posttest(int *errs)
 			config_error("ERROR: set::allowed-nickchars: you cannot combine 'hebrew-utf8' with any other character set");
 			errors++;
 		}
-		config_status("WARNING: set::allowed-nickchars: "
-		            "Mixing of charsets (eg: latin1+latin2) can cause display problems");
+		if (langav & LANGAV_ARABIC_UTF8)
+		{
+			config_error("ERROR: set::allowed-nickchars: you cannot combine 'arabic-utf8' with any other character set");
+			errors++;
+		}
+#endif
+		config_status("WARNING: set::allowed-nickchars: Mixing of charsets (eg: latin1+latin2) may cause display problems");
 	}
 
 	*errs = errors;
@@ -872,7 +881,7 @@ void charsys_add_language(char *name)
 	if (latin1 || !strcmp(name, "german"))
 	{
 		/* a", A", o", O", u", U" and es-zett */
-		charsys_addallowed("äÄöÖüÜß");
+		charsys_addallowed("ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
 	}
 	if (latin_utf8 || !strcmp(name, "german-utf8"))
 	{
@@ -887,7 +896,7 @@ void charsys_add_language(char *name)
 	if (latin1 || !strcmp(name, "swiss-german"))
 	{
 		/* a", A", o", O", u", U"  */
-		charsys_addallowed("äÄöÖüÜ");
+		charsys_addallowed("ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
 	}
 	if (latin_utf8 || !strcmp(name, "swiss-german-utf8"))
 	{
@@ -907,7 +916,7 @@ void charsys_add_language(char *name)
 		 * I suggest you to use just latin1 :P.
 		 */
 		/* e', e", o", i", u", e`. */
-		charsys_addallowed("éëöïüè");
+		charsys_addallowed("ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
 	}
 	if (latin_utf8 || !strcmp(name, "dutch-utf8"))
 	{
@@ -921,7 +930,7 @@ void charsys_add_language(char *name)
 	{
 		/* supplied by klaus:
 		 * <ae>, <AE>, ao, Ao, o/, O/ */
-		charsys_addallowed("æÆåÅøØ");
+		charsys_addallowed("ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
 	}
 	if (latin_utf8 || !strcmp(name, "danish-utf8"))
 	{
@@ -937,7 +946,7 @@ void charsys_add_language(char *name)
 		 * Hmm.. there might be more, but I'm not sure how common they are
 		 * and I don't think they are always displayed correctly (?).
 		 */
-		charsys_addallowed("ÀÂàâÇçÈÉÊËèéêëÎÏîïÔôÙÛÜùûüÿ");
+		charsys_addallowed("ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
 	}
 	if (latin_utf8 || !strcmp(name, "french-utf8"))
 	{
@@ -960,7 +969,7 @@ void charsys_add_language(char *name)
 	if (latin1 || !strcmp(name, "spanish"))
 	{
 		/* a', A', e', E', i', I', o', O', u', U', u", U", n~, N~ */
-		charsys_addallowed("áÁéÉíÍóÓúÚüÜñÑ");
+		charsys_addallowed("ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
 	}
 	if (latin_utf8 || !strcmp(name, "spanish-utf8"))
 	{
@@ -982,7 +991,7 @@ void charsys_add_language(char *name)
 	if (latin1 || !strcmp(name, "italian"))
 	{
 		/* A`, E`, E', I`, I', O`, O', U`, U', a`, e`, e', i`, i', o`, o', u`, u' */
-		charsys_addallowed("ÀÈÉÌÍÒÓÙÚàèéìíòóùú");
+		charsys_addallowed("ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
 	}
 	if (latin_utf8 || !strcmp(name, "italian-utf8"))
 	{
@@ -1001,7 +1010,7 @@ void charsys_add_language(char *name)
 	{
 		/* supplied by Trocotronic */
 		/* a`, A`, e`, weird-c, weird-C, E`, e', E', i', I', o`, O`, o', O', u', U', i", I", u", U", weird-dot */
-		charsys_addallowed("àÀçÇèÈéÉíÍòÒóÓúÚïÏüÜ");
+		charsys_addallowed("ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
 	}
 	if (latin_utf8 || !strcmp(name, "catalan-utf8"))
 	{
@@ -1023,7 +1032,7 @@ void charsys_add_language(char *name)
 	{
 		/* supplied by Tank */
 		/* ao, Ao, a", A", o", O" */
-		charsys_addallowed("åÅäÄöÖ");
+		charsys_addallowed("ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
 	}
 	if (latin_utf8 || !strcmp(name, "swedish-utf8"))
 	{
@@ -1035,7 +1044,7 @@ void charsys_add_language(char *name)
 	if (latin1 || !strcmp(name, "icelandic"))
 	{
 		/* supplied by Saevar */
-		charsys_addallowed("ÆæÖöÁáÍíĞğÚúÓóİıŞş");
+		charsys_addallowed("ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
 	}
 	if (latin_utf8 || !strcmp(name, "icelandic-utf8"))
 	{
@@ -1070,7 +1079,7 @@ void charsys_add_language(char *name)
 	{
 		/* supplied by AngryWolf */
 		/* a', e', i', o', o", o~, u', u", u~, A', E', I', O', O", O~, U', U", U~ */
-		charsys_addallowed("áéíóöõúüûÁÉÍÓÖÕÚÜÛ");
+		charsys_addallowed("ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
 	}
 	if (latin_utf8 || !strcmp(name, "hungarian-utf8"))
 	{
@@ -1096,7 +1105,7 @@ void charsys_add_language(char *name)
 	{
 		/* With some help from crazytoon */
 		/* 'S,' 's,' 'A^' 'A<' 'I^' 'T,' 'a^' 'a<' 'i^' 't,' */
-		charsys_addallowed("ªºÂÃÎŞâãîş");
+		charsys_addallowed("ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
 	}
 	if (latin_utf8 || !strcmp(name, "romanian-utf8"))
 	{
@@ -1112,7 +1121,7 @@ void charsys_add_language(char *name)
 	if (latin2 || !strcmp(name, "polish"))
 	{
 		/* supplied by k4be */
-		charsys_addallowed("±æê³ñó¶¿¼¡ÆÊ£ÑÓ¦¯¬");
+		charsys_addallowed("ï¿½ï¿½ï¿½ï¿½ó¶¿¼ï¿½ï¿½Ê£ï¿½Ó¦ï¿½ï¿½");
 	}
 	if (latin_utf8 || !strcmp(name, "polish-utf8"))
 	{
@@ -1128,12 +1137,12 @@ void charsys_add_language(char *name)
 	if (w1250 || !strcmp(name, "polish-w1250"))
 	{
 		/* supplied by k4be */
-		charsys_addallowed("¹æê³ñóœ¿Ÿ¥ÆÊ£ÑÓŒ¯");
+		charsys_addallowed("ï¿½ï¿½ï¿½ï¿½óœ¿Ÿï¿½ï¿½Ê£ï¿½ÓŒï¿½ï¿½");
 	}
 	if (w1250 || !strcmp(name, "czech-w1250"))
 	{
 		/* Syzop [probably incomplete] */
-		charsys_addallowed("ŠšÁÈÉÌÍÏÒÓØÙÚİáèéìíïòóøùúı");
+		charsys_addallowed("ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
 	}
 	if (latin_utf8 || !strcmp(name, "czech-utf8"))
 	{
@@ -1161,7 +1170,7 @@ void charsys_add_language(char *name)
 	if (w1250 || !strcmp(name, "slovak-w1250"))
 	{
 		/* Syzop [probably incomplete] */
-		charsys_addallowed("Šš¼¾ÀÁÄÅÈÉÍÏàáäåèéíïòóôúı");
+		charsys_addallowed("ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
 	}
 	if (latin_utf8 || !strcmp(name, "slovak-utf8"))
 	{
@@ -1192,7 +1201,7 @@ void charsys_add_language(char *name)
 		/* supplied by Roman Parkin:
 		 * 128-159 and 223-254
 		 */
-		charsys_addallowed("ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏĞÑÒÓÔÕÖ×ØÙÚÛÜİŞßàáâãäåæçèéêëìíîïğñòóôõö÷øùúûüışÿ¨¸");
+		charsys_addallowed("ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
 	}
 	if (cyrillic_utf8 || !strcmp(name, "russian-utf8"))
 	{
@@ -1208,7 +1217,7 @@ void charsys_add_language(char *name)
 		 * 128-159, 161, 162, 178, 179 and 223-254
 		 * Corrected 01.11.2006 to more "correct" behavior by Bock
 		 */
-		charsys_addallowed("ÀÁÂÃÄÅ¨ÆÇ²ÉÊËÌÍÎÏĞÑÒÓ¡ÔÕÖ×ØÛÜİŞßàáâãäå¸æç³éêëìíîïğñòó¢ôõö÷øûüışÿ");
+		charsys_addallowed("ï¿½ï¿½ï¿½ï¿½ï¿½Å¨ï¿½Ç²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ó¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
 	}
 	if (cyrillic_utf8 || !strcmp(name, "belarussian-utf8"))
 	{
@@ -1232,7 +1241,7 @@ void charsys_add_language(char *name)
 		 * 128-159, 170, 175, 178, 179, 186, 191 and 223-254
 		 * Corrected 01.11.2006 to more "correct" behavior by core
 		 */
-		charsys_addallowed("ÀÁÂÃ¥ÄÅªÆÇÈ²¯ÉÊËÌÍÎÏĞÑÒÓÔÕÖ×ØÙÜŞßàáâã´äåºæçè³¿éêëìíîïğñòóôõö÷øùüşÿ");
+		charsys_addallowed("ï¿½ï¿½ï¿½Ã¥ï¿½Åªï¿½ï¿½È²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½è³¿ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
 	}
 	if (cyrillic_utf8 || !strcmp(name, "ukrainian-utf8"))
 	{
@@ -1254,7 +1263,7 @@ void charsys_add_language(char *name)
 	{
 		/* supplied by GSF */
 		/* ranges from rfc1947 / iso 8859-7 */
-		charsys_addallowed("¶¸¹º¼¾¿ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏĞÑÓÔÕÖ×ØÙÚÛÜİŞßàáâãäåæçèéêëìíîïğñòóô");
+		charsys_addallowed("ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
 	}
 	if (!strcmp(name, "greek-utf8"))
 	{
@@ -1270,7 +1279,7 @@ void charsys_add_language(char *name)
 	if (!strcmp(name, "turkish"))
 	{
 		/* Supplied by Ayberk Yancatoral */
-		charsys_addallowed("öÖçÇşŞüÜğĞı");
+		charsys_addallowed("ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
 	}
 	if (!strcmp(name, "turkish-utf8"))
 	{
@@ -1290,7 +1299,7 @@ void charsys_add_language(char *name)
 	{
 		/* Supplied by PHANTOm. */
 		/* 0xE0 - 0xFE */
-		charsys_addallowed("àáâãäåæçèéêëìíîïğñòóôõö÷øùúûüış");
+		charsys_addallowed("ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
 	}
 	if (!strcmp(name, "hebrew-utf8"))
 	{
@@ -1321,7 +1330,7 @@ void charsys_add_language(char *name)
 	/* [LATVIAN] */
 	if (latin_utf8 || !strcmp(name, "latvian-utf8"))
 	{
-		/* A a, C c, E e, G g, I i, K k, Š š, U u,   */
+		/* A a, C c, E e, G g, I i, K k, ï¿½ ï¿½, U u, ï¿½ ï¿½ */
 		charsys_addmultibyterange(0xc4, 0xc4, 0x80, 0x81);
 		charsys_addmultibyterange(0xc4, 0xc4, 0x92, 0x93);
 		charsys_addmultibyterange(0xc4, 0xc4, 0x8c, 0x8d);
@@ -1337,7 +1346,7 @@ void charsys_add_language(char *name)
 	/* [ESTONIAN] */
 	if (latin_utf8 || !strcmp(name, "estonian-utf8"))
 	{
-		/* õ, ä, ö, ü,  Õ, Ä, Ö, Ü */
+		/* ï¿½, ï¿½, ï¿½, ï¿½,  ï¿½, ï¿½, ï¿½, ï¿½ */
 		charsys_addmultibyterange(0xc3, 0xc3, 0xb5, 0xb6);
 		charsys_addmultibyterange(0xc3, 0xc3, 0xa4, 0xa4);
 		charsys_addmultibyterange(0xc3, 0xc3, 0xbc, 0xbc);
@@ -1349,7 +1358,7 @@ void charsys_add_language(char *name)
 	/* [LITHUANIAN] */
 	if (latin_utf8 || !strcmp(name, "lithuanian-utf8"))
 	{
-		/* a, c, e, e, i, š, u, u, , A, C, E, E, I, Š, U, U,  */
+		/* a, c, e, e, i, ï¿½, u, u, ï¿½, A, C, E, E, I, ï¿½, U, U, ï¿½ */
 		charsys_addmultibyterange(0xc4, 0xc4, 0x84, 0x85);
 		charsys_addmultibyterange(0xc4, 0xc4, 0x8c, 0x8d);
 		charsys_addmultibyterange(0xc4, 0xc4, 0x96, 0x99);
@@ -1359,6 +1368,19 @@ void charsys_add_language(char *name)
 		charsys_addmultibyterange(0xc5, 0xc5, 0xb2, 0xb3);
 		charsys_addmultibyterange(0xc5, 0xc5, 0xaa, 0xab);
 		charsys_addmultibyterange(0xc5, 0xc5, 0xbd, 0xbe);
+	}
+
+	/* [ARABIC] */
+	if (latin_utf8 || !strcmp(name, "arabic-utf8"))
+	{
+		/* Supplied by Sensiva */
+		/*charsys_addallowed("Ø§Ø£Ø¥Ø¢Ø¡Ø¨ØªØ«Ø¬Ø­Ø®Ø¯Ø°Ø±Ø²Ø³Ø´ØµØ¶Ø·Ø¸Ø¹ØºÙÙ‚ÙƒÙ„Ù…Ù†Ù‡Ø¤Ø©ÙˆÙŠÙ‰Ø¦");*/
+		/*- From U+0621 to U+063A (Regex: [\u0621-\u063A])*/
+		/* 0xd8a1 - 0xd8ba */
+		charsys_addmultibyterange(0xd8, 0xd8, 0xa1, 0xba);
+		/*- From U+0641 to U+064A (Regex: [\u0641-\u064A])*/
+		/* 0xd981 - 0xd98a */
+		charsys_addmultibyterange(0xd9, 0xd9, 0x81, 0x8a);
 	}
 
 	/* [EMOJI] */
@@ -1501,6 +1523,8 @@ char *charsys_group(int v)
 		return "Greek script";
 	if (v & LANGAV_HEBREW_UTF8)
 		return "Hebrew script";
+	if (v & LANGAV_ARABIC_UTF8)
+		return "Arabic script";
 
 	return "Other";
 }
