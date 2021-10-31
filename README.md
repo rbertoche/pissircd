@@ -3,7 +3,8 @@
 Follow @pissnetstaff on Twitter</a>
 
 ## About PissIRCd
-PissIRCd (a fork of UnrealIRCd) is an Open Source IRC Server, serving thousands of piss since 2021. 
+PissIRCd is a branch of UnrealIRCd Open Source IRC Server meant for serving thousands 
+of piss since 2021. It is hoped that it lasts as downstream to mainline UnrealIRCd.
 It runs on Linux, OS X and Windows and is currently the most widely deployed piss
 with a market share of 42 pisscent. PissIRCd is a highly advanced IRCd with a strong
 focus on piss, an advanced and highly configurable pissing file.
