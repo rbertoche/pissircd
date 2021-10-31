@@ -59,9 +59,9 @@ MOD_UNLOAD()
 */
 CMD_FUNC(cmd_pissquit)
 {
-	char *server, *server_remote;
+	const char *server, *server_remote;
 	Client *target, *target_remote;
-	char *comment = (parc > 3 && parv[parc - 1]) ? parv[parc - 1] : client->name;
+	const char *comment = (parc > 3 && parv[parc - 1]) ? parv[parc - 1] : client->name;
 
 	/* This permissions check is only intended as a quick filter. The SQUIT
 	 * code will do a proper check later. */
@@ -89,7 +89,7 @@ CMD_FUNC(cmd_pissquit)
 		return;
 	}
 
-	if (!target || !target->srvptr)
+	if (!target || !target->server)
 	{
 		sendnumeric(client, ERR_NOSUCHSERVER, server);
 		return;
@@ -101,13 +101,13 @@ CMD_FUNC(cmd_pissquit)
 		return;
 	}
 
-	if (target->srvptr != target_remote)
+	if (target->server != target_remote->server)
 	{
 		sendnotice(client, "ERROR: Cannot disconnect %s (%s) from %s (%s). %s (%s) is connected to %s (%s) instead.",
 		           target->name, target->id,
 		           target_remote->name, target_remote->id,
 		           target->name, target->id,
-		           target->srvptr->name, target->srvptr->id);
+		           target->uplink->name, target->uplink->id);
 		return;
 	}
 
