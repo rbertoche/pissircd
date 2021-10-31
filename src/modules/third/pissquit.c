@@ -32,7 +32,7 @@ ModuleHeader MOD_HEADER
 	"0.02",
 	"command /pissquit: Positively Identify Server to Server QUIT", 
 	"pissnet team",
-	"unrealircd-5",
+	"unrealircd-6",
     };
 
 MOD_INIT()
