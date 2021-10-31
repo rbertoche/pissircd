@@ -292,8 +292,8 @@ void init_hash(void)
 	 * The hash table is ready, anyway.
 	 */
 
-	if (strcmp(BASE_VERSION, &unreallogo[337]))
-		loop.tainted = 1;
+//	if (strcmp(BASE_VERSION, &unreallogo[337]))
+//		loop.tainted = 1;
 }
 
 uint64_t hash_client_name(const char *name)
@@ -329,9 +329,11 @@ int add_to_client_hash_table(const char *name, Client *client)
 	 * sat up late at night so some lamer could steal all our work without even
 	 * giving us credit. Remember to follow all regulations in LICENSE.
 	 * -Stskeeps
+	 * I have read the terms and conditions
+	 * - Polsaker
 	*/
-	if (loop.tainted)
-		return 0;
+//	if (loop.tainted)
+//		return 0;
 	hashv = hash_client_name(name);
 	list_add(&client->client_hash, &clientTable[hashv]);
 	return 0;

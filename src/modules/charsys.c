@@ -29,7 +29,7 @@
 ModuleHeader MOD_HEADER
 = {
 	"charsys",	/* Name of module */
-	"5.0", /* Version */
+	"5.0-emoji-0.2.1", /* Version */
 	"Character System (set::allowed-nickchars)", /* Short description of module */
 	"UnrealIRCd Team",
 	"unrealircd-6",
@@ -49,6 +49,15 @@ struct MBList
 	char s1, e1, s2, e2;
 };
 MBList *mblist = NULL, *mblist_tail = NULL;
+
+/** Our unicode structure */
+typedef struct UList UList;
+struct UList
+{
+	UList *next;
+	wchar_t start, end;
+};
+UList *ulist = NULL, *ulist_tail = NULL;
 
 /* Use this to prevent mixing of certain combinations
  * (such as GBK & high-ascii, etc)
@@ -85,6 +94,7 @@ struct LangList
 /* MUST be alphabetized (first column) */
 static LangList langlist[] = {
 	{ "arabic-utf8", "ara-utf8", LANGAV_ASCII|LANGAV_UTF8|LANGAV_ARABIC_UTF8 },
+	{ "arabic-utf8", "ara-utf8", LANGAV_ASCII|LANGAV_UTF8|LANGAV_ARABIC_UTF8 },
 	{ "belarussian-utf8", "blr-utf8", LANGAV_ASCII|LANGAV_UTF8|LANGAV_CYRILLIC_UTF8 },
 	{ "belarussian-w1251", "blr", LANGAV_ASCII|LANGAV_W1251 },
 	{ "catalan",      "cat", LANGAV_ASCII|LANGAV_LATIN1 },
@@ -100,6 +110,7 @@ static LangList langlist[] = {
 	{ "danish-utf8",  "dan-utf8", LANGAV_ASCII|LANGAV_UTF8|LANGAV_LATIN_UTF8 },
 	{ "dutch",        "dut", LANGAV_ASCII|LANGAV_LATIN1 },
 	{ "dutch-utf8",   "dut-utf8", LANGAV_ASCII|LANGAV_UTF8|LANGAV_LATIN_UTF8 },
+	{ "emoji-utf8",   "emo-utf8", LANGAV_UTF8 },
 	{ "estonian-utf8","est-utf8", LANGAV_ASCII|LANGAV_UTF8|LANGAV_LATIN_UTF8 },
 	{ "french",       "fre", LANGAV_ASCII|LANGAV_LATIN1 },
 	{ "french-utf8",  "fre-utf8", LANGAV_ASCII|LANGAV_UTF8|LANGAV_LATIN_UTF8 },
@@ -226,7 +237,7 @@ int charsys_config_test(ConfigFile *cf, ConfigEntry *ce, int type, int *errs)
 	if (type != CONFIG_SET)
 		return 0;
 
-	/* We are only interrested in set::allowed-nickchars... */
+	/* We are only interested in set::allowed-nickchars... */
 	if (!ce || !ce->name || strcmp(ce->name, "allowed-nickchars"))
 		return 0;
 
@@ -354,6 +365,7 @@ void charsys_reset(void)
 {
 	int i;
 	MBList *m, *m_next;
+	UList *u, *u_next;
 
 	/* First, reset everything */
 	for (i=0; i < 256; i++)
@@ -364,6 +376,14 @@ void charsys_reset(void)
 		safe_free(m);
 	}
 	mblist=mblist_tail=NULL;
+
+	for (u = ulist; u; u = u_next)
+	{
+		u_next = u->next;
+		safe_free(u);
+	}
+	ulist = ulist_tail = NULL;
+
 	/* Then add the default which will always be allowed */
 	charsys_addallowed("0123456789-ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyzy{|}");
 	langav = 0;
@@ -458,6 +478,21 @@ MBList *m = safe_alloc(sizeof(MBList));
 	mblist_tail = m;
 }
 
+void charsys_addunicoderange(wchar_t start, wchar_t end)
+{
+	UList *u = safe_alloc(sizeof(UList));
+
+	u->start = start;
+	u->end = end;
+
+	if (ulist_tail)
+		ulist_tail->next = u;
+	else
+		ulist = u;
+
+	ulist_tail = u;
+}
+
 /** Adds all characters in the specified string to the allowed list. */
 void charsys_addallowed(char *s)
 {
@@ -484,7 +519,7 @@ void charsys_addallowed_range(unsigned char from, unsigned char to)
 
 int _do_nick_name(char *nick)
 {
-	if (mblist)
+	if (mblist || ulist)
 		return do_nick_name_multibyte(nick);
 	else
 		return do_nick_name_standard(nick);
@@ -518,6 +553,76 @@ static int isvalidmbyte(unsigned char c1, unsigned char c2)
 	return 0;
 }
 
+static int isvalidunicodechar(wchar_t uch)
+{
+	UList *u;
+
+	for (u = ulist; u; u = u->next)
+	{
+		if (uch >= u->start && uch <= u->end)
+			return 1;
+	}
+
+	return 0;
+}
+
+static int isvalidunicodenick(wchar_t *unick)
+{
+	wchar_t *uch, *puch = 0;
+	/* Consecutive number of U+1F3F4 (waving black flag) and U+E0030..U+E0039 (tag digit one..nine)
+	 * plus U+E0061..U+E007A (tag latin small letter a..z) code points */
+	int black_flag_or_tag_count = 0;
+
+	for (uch = unick; *uch; puch = uch, uch++)
+	{
+		/* Accept only a single ZWJ (U+200D) or a single VS16 (U+FE0F) potentially followed by a ZWJ.
+		 *
+		 * They always have to follow an emoji (assumed to be a U+2600 or higher code point). */
+		if ( (*uch == 0x200d || *uch == 0xfe0f) && (!puch || *puch < 0x2600 || *puch == *uch) )
+			return 0;
+
+		/* Don't end unicode sequence on a ZWJ. */
+		if (*uch <= 0x2600 && puch && *puch == 0x200d)
+			return 0;
+
+		/* U+1F3F4 (waving black flag) followed by a number of U+E0030..U+E0039 (tag digit zero..nine) and
+		 * U+E0061..U+E007A (tag latin small letter a..z) code points are used for regional flags. See [0].
+		 *
+		 * [0] https://www.unicode.org/reports/tr51/#valid-emoji-tag-sequences
+		 */
+		if (*uch == 0x1f3f4) {
+			/* We're already in the middle of a flag sequence. */
+			if (black_flag_or_tag_count)
+				return 0;
+			black_flag_or_tag_count = 1;
+		}
+		else if ( (*uch >= 0xe0030 && *uch <= 0xe0039) || (*uch >= 0xe0061 && *uch <= 0xe007a) )
+		{
+			/* We only support latin tags after a black flag. */
+			if (black_flag_or_tag_count < 1)
+				return 0;
+			black_flag_or_tag_count++;
+		}
+		else if (*uch == 0xe007f)
+		{
+			/* Cancel tags only come after a black flag and at least one alphanumeric tag. */
+			if (black_flag_or_tag_count <= 2)
+				return 0;
+			black_flag_or_tag_count = 0;
+		}
+	}
+
+	/* Truncated flag. */
+	if (black_flag_or_tag_count > 1)
+		return 0;
+
+	/* We can't end on a ZWJ */
+	if (puch && *puch == 0x200d)
+		return 0;
+
+	return 1;
+}
+
 /* hmmm.. there must be some problems with multibyte &
  * other high ascii characters I think (such as german etc).
  * Not sure if this can be solved? I don't think so... -- Syzop.
@@ -526,31 +631,106 @@ static int do_nick_name_multibyte(char *nick)
 {
 	int len;
 	char *ch;
-	int firstmbchar = 0;
+	wchar_t uch, unick[NICKLEN+1], *uchp;
+	int firstmbchar = 0, utf8seq = 0, utf8width = 0;
 
 	if ((*nick == '-') || isdigit(*nick))
 		return 0;
+
+	uchp = unick;
 
 	for (ch=nick,len=0; *ch && len <= NICKLEN; ch++, len++)
 	{
 		/* Some characters are ALWAYS illegal, so they have to be disallowed here */
 		if ((*ch <= 32) || strchr(illegalnickchars, *ch))
 			return 0;
-		if (firstmbchar)
+
+		if (utf8seq && !firstmbchar)
+		{
+			if (((*ch) & 0xc0) == 0x80)
+				/* Still in a valid UTF-8 sequence */
+				utf8seq++;
+			else
+				/* We were in an UTF-8 sequence but this byte's not valid, bail out */
+				return 0;
+
+			if (utf8seq == utf8width)
+			{
+				/* mbtowc is locale dependent so let's YOLO this ourselves */
+				if (utf8width == 4)
+					uch = (wchar_t)(((ch[-3] & 0x7) << 18) + ((ch[-2] & 0x3f) << 12) + ((ch[-1] & 0x3f) << 6) + (*ch & 0x3f));
+				else if (utf8width == 3)
+					uch = (wchar_t)(((ch[-2] & 0xf) << 12) + ((ch[-1] & 0x3f) << 6) + (*ch & 0x3f));
+				/* Disabled to prevent conflicts with existing multi-byte support. */
+				/*
+				else if (utf8width == 2)
+					uch = (wchar_t)(((ch[-1] & 0x1f) << 6) + (*ch & 0x3f));
+				*/
+				else
+					/* How did we get here? */
+					return 0;
+
+				if (!isvalidunicodechar(uch))
+					return 0;
+
+				utf8seq = utf8width = 0;
+				*uchp++ = uch;
+			}
+		}
+		else if (!firstmbchar && ((*ch) & 0xf8) == 0xf0)
+		{
+			utf8seq = 1;
+			utf8width = 4;
+		}
+		else if (!firstmbchar && ((*ch) & 0xf0) == 0xe0)
+		{
+			utf8seq = 1;
+			utf8width = 3;
+		}
+		/* Disabled to prevent conflicts with existing multi-byte support. */
+		/*
+		else if (!firstmbchar && ((*ch) & 0xe0) == 0xc0)
+		{
+			utf8seq = 1;
+			utf8width = 2;
+		}
+		*/
+		else if (firstmbchar)
 		{
 			if (!isvalidmbyte(ch[-1], *ch))
 				return 0;
+
 			firstmbchar = 0;
-		} else if ((*ch) & 0x80)
+
+			/* Still blisfully ignoring the existing multibyte support on the
+			 * emoji unicode side of things. */
+			*uchp++ = ch[-1];
+			*uchp++ = *ch;
+		}
+		else if ((*ch) & 0x80)
 			firstmbchar = 1;
 		else if (!isvalid(*ch))
 			return 0;
+		else
+			*uchp++ = *ch;
 	}
+
 	if (firstmbchar)
 	{
 		ch--;
 		len--;
 	}
+
+	if (utf8seq)
+	{
+		ch -= utf8seq;
+		len -= utf8seq;
+	}
+
+	*uchp++ = '\0';
+	if (!isvalidunicodenick(unick))
+		return 0;
+
 	*ch = '\0';
 	return len;
 }
@@ -701,7 +881,7 @@ void charsys_add_language(char *name)
 	if (latin1 || !strcmp(name, "german"))
 	{
 		/* a", A", o", O", u", U" and es-zett */
-		charsys_addallowed("äÄöÖüÜß");
+		charsys_addallowed("ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
 	}
 	if (latin_utf8 || !strcmp(name, "german-utf8"))
 	{
@@ -716,7 +896,7 @@ void charsys_add_language(char *name)
 	if (latin1 || !strcmp(name, "swiss-german"))
 	{
 		/* a", A", o", O", u", U"  */
-		charsys_addallowed("äÄöÖüÜ");
+		charsys_addallowed("ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
 	}
 	if (latin_utf8 || !strcmp(name, "swiss-german-utf8"))
 	{
@@ -736,7 +916,7 @@ void charsys_add_language(char *name)
 		 * I suggest you to use just latin1 :P.
 		 */
 		/* e', e", o", i", u", e`. */
-		charsys_addallowed("éëöïüè");
+		charsys_addallowed("ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
 	}
 	if (latin_utf8 || !strcmp(name, "dutch-utf8"))
 	{
@@ -750,7 +930,7 @@ void charsys_add_language(char *name)
 	{
 		/* supplied by klaus:
 		 * <ae>, <AE>, ao, Ao, o/, O/ */
-		charsys_addallowed("æÆåÅøØ");
+		charsys_addallowed("ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
 	}
 	if (latin_utf8 || !strcmp(name, "danish-utf8"))
 	{
@@ -766,7 +946,7 @@ void charsys_add_language(char *name)
 		 * Hmm.. there might be more, but I'm not sure how common they are
 		 * and I don't think they are always displayed correctly (?).
 		 */
-		charsys_addallowed("ÀÂàâÇçÈÉÊËèéêëÎÏîïÔôÙÛÜùûüÿ");
+		charsys_addallowed("ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
 	}
 	if (latin_utf8 || !strcmp(name, "french-utf8"))
 	{
@@ -789,7 +969,7 @@ void charsys_add_language(char *name)
 	if (latin1 || !strcmp(name, "spanish"))
 	{
 		/* a', A', e', E', i', I', o', O', u', U', u", U", n~, N~ */
-		charsys_addallowed("áÁéÉíÍóÓúÚüÜñÑ");
+		charsys_addallowed("ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
 	}
 	if (latin_utf8 || !strcmp(name, "spanish-utf8"))
 	{
@@ -811,7 +991,7 @@ void charsys_add_language(char *name)
 	if (latin1 || !strcmp(name, "italian"))
 	{
 		/* A`, E`, E', I`, I', O`, O', U`, U', a`, e`, e', i`, i', o`, o', u`, u' */
-		charsys_addallowed("ÀÈÉÌÍÒÓÙÚàèéìíòóùú");
+		charsys_addallowed("ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
 	}
 	if (latin_utf8 || !strcmp(name, "italian-utf8"))
 	{
@@ -830,7 +1010,7 @@ void charsys_add_language(char *name)
 	{
 		/* supplied by Trocotronic */
 		/* a`, A`, e`, weird-c, weird-C, E`, e', E', i', I', o`, O`, o', O', u', U', i", I", u", U", weird-dot */
-		charsys_addallowed("àÀçÇèÈéÉíÍòÒóÓúÚïÏüÜ");
+		charsys_addallowed("ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
 	}
 	if (latin_utf8 || !strcmp(name, "catalan-utf8"))
 	{
@@ -852,7 +1032,7 @@ void charsys_add_language(char *name)
 	{
 		/* supplied by Tank */
 		/* ao, Ao, a", A", o", O" */
-		charsys_addallowed("åÅäÄöÖ");
+		charsys_addallowed("ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
 	}
 	if (latin_utf8 || !strcmp(name, "swedish-utf8"))
 	{
@@ -864,7 +1044,7 @@ void charsys_add_language(char *name)
 	if (latin1 || !strcmp(name, "icelandic"))
 	{
 		/* supplied by Saevar */
-		charsys_addallowed("ÆæÖöÁáÍíĞğÚúÓóİıŞş");
+		charsys_addallowed("ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
 	}
 	if (latin_utf8 || !strcmp(name, "icelandic-utf8"))
 	{
@@ -892,7 +1072,7 @@ void charsys_add_language(char *name)
 	{
 		/* supplied by AngryWolf */
 		/* a', e', i', o', o", o~, u', u", u~, A', E', I', O', O", O~, U', U", U~ */
-		charsys_addallowed("áéíóöõúüûÁÉÍÓÖÕÚÜÛ");
+		charsys_addallowed("ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
 	}
 	if (latin_utf8 || !strcmp(name, "hungarian-utf8"))
 	{
@@ -918,7 +1098,7 @@ void charsys_add_language(char *name)
 	{
 		/* With some help from crazytoon */
 		/* 'S,' 's,' 'A^' 'A<' 'I^' 'T,' 'a^' 'a<' 'i^' 't,' */
-		charsys_addallowed("ªºÂÃÎŞâãîş");
+		charsys_addallowed("ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
 	}
 	if (latin_utf8 || !strcmp(name, "romanian-utf8"))
 	{
@@ -934,7 +1114,7 @@ void charsys_add_language(char *name)
 	if (latin2 || !strcmp(name, "polish"))
 	{
 		/* supplied by k4be */
-		charsys_addallowed("±æê³ñó¶¿¼¡ÆÊ£ÑÓ¦¯¬");
+		charsys_addallowed("ï¿½ï¿½ï¿½ï¿½ó¶¿¼ï¿½ï¿½Ê£ï¿½Ó¦ï¿½ï¿½");
 	}
 	if (latin_utf8 || !strcmp(name, "polish-utf8"))
 	{
@@ -950,12 +1130,12 @@ void charsys_add_language(char *name)
 	if (w1250 || !strcmp(name, "polish-w1250"))
 	{
 		/* supplied by k4be */
-		charsys_addallowed("¹æê³ñóœ¿Ÿ¥ÆÊ£ÑÓŒ¯");
+		charsys_addallowed("ï¿½ï¿½ï¿½ï¿½óœ¿Ÿï¿½ï¿½Ê£ï¿½ÓŒï¿½ï¿½");
 	}
 	if (w1250 || !strcmp(name, "czech-w1250"))
 	{
 		/* Syzop [probably incomplete] */
-		charsys_addallowed("ŠšÁÈÉÌÍÏÒÓØÙÚİáèéìíïòóøùúı");
+		charsys_addallowed("ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
 	}
 	if (latin_utf8 || !strcmp(name, "czech-utf8"))
 	{
@@ -983,7 +1163,7 @@ void charsys_add_language(char *name)
 	if (w1250 || !strcmp(name, "slovak-w1250"))
 	{
 		/* Syzop [probably incomplete] */
-		charsys_addallowed("Šš¼¾ÀÁÄÅÈÉÍÏàáäåèéíïòóôúı");
+		charsys_addallowed("ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
 	}
 	if (latin_utf8 || !strcmp(name, "slovak-utf8"))
 	{
@@ -1014,7 +1194,7 @@ void charsys_add_language(char *name)
 		/* supplied by Roman Parkin:
 		 * 128-159 and 223-254
 		 */
-		charsys_addallowed("ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏĞÑÒÓÔÕÖ×ØÙÚÛÜİŞßàáâãäåæçèéêëìíîïğñòóôõö÷øùúûüışÿ¨¸");
+		charsys_addallowed("ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
 	}
 	if (cyrillic_utf8 || !strcmp(name, "russian-utf8"))
 	{
@@ -1030,7 +1210,7 @@ void charsys_add_language(char *name)
 		 * 128-159, 161, 162, 178, 179 and 223-254
 		 * Corrected 01.11.2006 to more "correct" behavior by Bock
 		 */
-		charsys_addallowed("ÀÁÂÃÄÅ¨ÆÇ²ÉÊËÌÍÎÏĞÑÒÓ¡ÔÕÖ×ØÛÜİŞßàáâãäå¸æç³éêëìíîïğñòó¢ôõö÷øûüışÿ");
+		charsys_addallowed("ï¿½ï¿½ï¿½ï¿½ï¿½Å¨ï¿½Ç²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ó¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
 	}
 	if (cyrillic_utf8 || !strcmp(name, "belarussian-utf8"))
 	{
@@ -1054,7 +1234,7 @@ void charsys_add_language(char *name)
 		 * 128-159, 170, 175, 178, 179, 186, 191 and 223-254
 		 * Corrected 01.11.2006 to more "correct" behavior by core
 		 */
-		charsys_addallowed("ÀÁÂÃ¥ÄÅªÆÇÈ²¯ÉÊËÌÍÎÏĞÑÒÓÔÕÖ×ØÙÜŞßàáâã´äåºæçè³¿éêëìíîïğñòóôõö÷øùüşÿ");
+		charsys_addallowed("ï¿½ï¿½ï¿½Ã¥ï¿½Åªï¿½ï¿½È²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½è³¿ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
 	}
 	if (cyrillic_utf8 || !strcmp(name, "ukrainian-utf8"))
 	{
@@ -1076,7 +1256,7 @@ void charsys_add_language(char *name)
 	{
 		/* supplied by GSF */
 		/* ranges from rfc1947 / iso 8859-7 */
-		charsys_addallowed("¶¸¹º¼¾¿ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏĞÑÓÔÕÖ×ØÙÚÛÜİŞßàáâãäåæçèéêëìíîïğñòóô");
+		charsys_addallowed("ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
 	}
 	if (!strcmp(name, "greek-utf8"))
 	{
@@ -1092,7 +1272,7 @@ void charsys_add_language(char *name)
 	if (!strcmp(name, "turkish"))
 	{
 		/* Supplied by Ayberk Yancatoral */
-		charsys_addallowed("öÖçÇşŞüÜğĞı");
+		charsys_addallowed("ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
 	}
 	if (!strcmp(name, "turkish-utf8"))
 	{
@@ -1112,7 +1292,7 @@ void charsys_add_language(char *name)
 	{
 		/* Supplied by PHANTOm. */
 		/* 0xE0 - 0xFE */
-		charsys_addallowed("àáâãäåæçèéêëìíîïğñòóôõö÷øùúûüış");
+		charsys_addallowed("ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
 	}
 	if (!strcmp(name, "hebrew-utf8"))
 	{
@@ -1143,7 +1323,7 @@ void charsys_add_language(char *name)
 	/* [LATVIAN] */
 	if (latin_utf8 || !strcmp(name, "latvian-utf8"))
 	{
-		/* A a, C c, E e, G g, I i, K k, Š š, U u,   */
+		/* A a, C c, E e, G g, I i, K k, ï¿½ ï¿½, U u, ï¿½ ï¿½ */
 		charsys_addmultibyterange(0xc4, 0xc4, 0x80, 0x81);
 		charsys_addmultibyterange(0xc4, 0xc4, 0x92, 0x93);
 		charsys_addmultibyterange(0xc4, 0xc4, 0x8c, 0x8d);
@@ -1159,7 +1339,7 @@ void charsys_add_language(char *name)
 	/* [ESTONIAN] */
 	if (latin_utf8 || !strcmp(name, "estonian-utf8"))
 	{
-		/* õ, ä, ö, ü,  Õ, Ä, Ö, Ü */
+		/* ï¿½, ï¿½, ï¿½, ï¿½,  ï¿½, ï¿½, ï¿½, ï¿½ */
 		charsys_addmultibyterange(0xc3, 0xc3, 0xb5, 0xb6);
 		charsys_addmultibyterange(0xc3, 0xc3, 0xa4, 0xa4);
 		charsys_addmultibyterange(0xc3, 0xc3, 0xbc, 0xbc);
@@ -1171,7 +1351,7 @@ void charsys_add_language(char *name)
 	/* [LITHUANIAN] */
 	if (latin_utf8 || !strcmp(name, "lithuanian-utf8"))
 	{
-		/* a, c, e, e, i, š, u, u, , A, C, E, E, I, Š, U, U,  */
+		/* a, c, e, e, i, ï¿½, u, u, ï¿½, A, C, E, E, I, ï¿½, U, U, ï¿½ */
 		charsys_addmultibyterange(0xc4, 0xc4, 0x84, 0x85);
 		charsys_addmultibyterange(0xc4, 0xc4, 0x8c, 0x8d);
 		charsys_addmultibyterange(0xc4, 0xc4, 0x96, 0x99);
@@ -1195,11 +1375,83 @@ void charsys_add_language(char *name)
 		/* 0xd981 - 0xd98a */
 		charsys_addmultibyterange(0xd9, 0xd9, 0x81, 0x8a);
 	}
+
+	/* [EMOJI] */
+	if (!strcmp(name, "emoji-utf8"))
+	{
+		/* Wikipedia perhaps isn't the best place to base our ranges on
+		 * but it works for now.
+		 *
+		 * ZWJ (U+200D) and Variant Selector 16 (U+FE0F) can be used in
+		 * homoglyph attacks so there's a check in isvalidunicodenick
+		 * to attempt to mitigate (but not remove!) the risk.
+		 *
+		 * Only 3 and 4 byte UTF-8 sequences are supported to make sure
+		 * the UTF-8 decoding doesn't break the existing multi-byte
+		 * support.
+		 *
+		 * isvalidunicodenick needs to be updated if any emoji code
+		 * points under U+2600 are added.
+		 */
+
+		/* https://en.wikipedia.org/wiki/Zero-width_joiner */
+		charsys_addunicoderange(0x200d, 0x200d);
+
+		/* https://en.wikipedia.org/wiki/Miscellaneous_Symbols*/
+		charsys_addunicoderange(0x2600, 0x26ff);
+
+		/* https://en.wikipedia.org/wiki/Dingbat#Encoding */
+		charsys_addunicoderange(0x2700, 0x27bf);
+
+		/* https://en.wikipedia.org/wiki/Variation_Selectors_(Unicode_block) */
+		charsys_addunicoderange(0xfe0f, 0xfe0f);
+
+		/* https://en.wikipedia.org/wiki/Regional_indicator_symbol */
+		charsys_addunicoderange(0x1f1e6, 0x1f1ff);
+
+		/* https://en.wikipedia.org/wiki/Miscellaneous_Symbols_and_Pictographs */
+		charsys_addunicoderange(0x1f300, 0x1f5ff);
+
+		/* https://en.wikipedia.org/wiki/Emoticons_(Unicode_block)#Emoji_modifiers
+		 * https://en.wikipedia.org/wiki/Miscellaneous_Symbols#Emoji_modifiers
+		 * https://en.wikipedia.org/wiki/Supplemental_Symbols_and_Pictographs#Emoji_modifiers
+		 * https://en.wikipedia.org/wiki/Miscellaneous_Symbols_and_Pictographs#Emoji_modifiers
+		 * https://en.wikipedia.org/wiki/Transport_and_Map_Symbols#Emoji_modifiers
+		 * https://en.wikipedia.org/wiki/Dingbat#Emoji_modifiers
+		 *
+		 * These are included in the previous range but still listed
+		 * separately due to their importance.
+		 */
+		charsys_addunicoderange(0x1f3fb, 0x1f3ff);
+
+		/* https://en.wikipedia.org/wiki/Emoticons_(Unicode_block) */
+		charsys_addunicoderange(0x1f600, 0x1f64f);
+
+		/* https://en.wikipedia.org/wiki/Transport_and_Map_Symbols */
+		charsys_addunicoderange(0x1f680, 0x1f6ff);
+
+		/* https://en.wikipedia.org/wiki/Supplemental_Symbols_and_Pictographs */
+		charsys_addunicoderange(0x1f900, 0x1f9ff);
+
+		/* https://en.wikipedia.org/wiki/Symbols_and_Pictographs_Extended-A */
+		charsys_addunicoderange(0x1fa70, 0x1faff);
+
+		/* https://www.unicode.org/reports/tr51/#valid-emoji-tag-sequences */
+		/* tag digit zero .. tag digit nine */
+		charsys_addunicoderange(0xe0030, 0xe0039);
+
+		/* tag latin small letter a .. tag latin small letter z */
+		charsys_addunicoderange(0xe0061, 0xe007a);
+
+		/* cancel tag */
+		charsys_addunicoderange(0xe007f, 0xe007f);
+	}
 }
 
 /** This displays all the nick characters that are permitted */
 char *charsys_displaychars(void)
 {
+	/* TODO: Add ulist rendering */
 #if 0
 	MBList *m;
 	unsigned char hibyte, lobyte;
