@@ -101,7 +101,7 @@ CMD_FUNC(cmd_pissquit)
 		return;
 	}
 
-	if (target->server != target_remote->server)
+	if (target != target_remote->uplink)
 	{
 		sendnotice(client, "ERROR: Cannot disconnect %s (%s) from %s (%s). %s (%s) is connected to %s (%s) instead.",
 		           target->name, target->id,
