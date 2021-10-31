@@ -89,7 +89,8 @@ void sendto_wallops(Client *from, FORMAT_STRING(const char *pattern), ...)
 */
 CMD_FUNC(cmd_wallops)
 {
-	const char *message = parc > 1 ? parv[1] : NULL;
+	char *message;
+	message = parc > 1 ? parv[1] : NULL;
 
 	if (BadPtr(message))
 	{
