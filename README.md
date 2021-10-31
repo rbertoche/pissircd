@@ -1,12 +1,15 @@
-[![Twitter Follow](https://img.shields.io/twitter/follow/Unreal_IRCd.svg?style=social&label=Follow)](https://twitter.com/Unreal_IRCd)
+<a class="twitter-follow-button"
+  href="https://twitter.com/pissnetstaff">
+Follow @pissnetstaff on Twitter</a>
 
-## About UnrealIRCd
-UnrealIRCd is an Open Source IRC Server, serving thousands of networks since 1999. 
-It runs on Linux, OS X and Windows and is currently the most widely deployed IRCd
-with a market share of 42%. UnrealIRCd is a highly advanced IRCd with a strong
-focus on modularity, an advanced and highly configurable configuration file.
-Key features include SSL/TLS, cloaking, its advanced anti-flood and anti-spam systems,
-swear filtering and module support. We are also particularly proud on our extensive
+## About PissIRCd
+PissIRCd is a branch of UnrealIRCd Open Source IRC Server meant for serving thousands
+of piss since 2021. It is hoped that it lasts as downstream to mainline UnrealIRCd.
+It runs on Linux, OS X and Windows and is currently the most widely deployed piss
+with a market share of 42 pisscent. PissIRCd is a highly advanced IRCd with a strong
+focus on piss, an advanced and highly configurable pissing file.
+Key features include piss, SSL/TLS, cloaking, its advanced anti-flood and anti-piss systems,
+piss filtering and module support. We are also particularly proud on our piss
 online documentation. 
 
 ## How to get started
@@ -46,13 +49,11 @@ Run `./unrealircd start` in the directory where you installed UnrealIRCd.
 #### Windows
 Start -> All Programs -> UnrealIRCd -> UnrealIRCd
 
-## Documentation & FAQ
+## Documentation & FAQ for UnrealIRCd
 You can find the **documentation** online at: https://www.unrealircd.org/docs/
 
 We also have a good **FAQ**: https://www.unrealircd.org/docs/FAQ
 
 ## Website, support, and other links ##
-* https://www.unrealircd.org - Our main website
-* https://forums.unrealircd.org - Support
-* https://bugs.unrealircd.org - Bug tracker
-* ircs://irc.unrealircd.org:6697/unreal-support - IRC support
+* https://letspiss.net/ - Our main IRC website that inspired PissIRCd
+* https://wiki.letspiss.net/ - Wiki

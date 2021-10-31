@@ -1,4 +1,4 @@
-UnrealIRCd 6.0.0-beta1
+UnrealIRCd 6 with piss
 =======================
 This is the first beta for UnrealIRCd 6. It contains all the planned
 features for U6 and now we need the help of the public to test these beta's.

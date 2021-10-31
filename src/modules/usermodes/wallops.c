@@ -89,7 +89,8 @@ void sendto_wallops(Client *from, FORMAT_STRING(const char *pattern), ...)
 */
 CMD_FUNC(cmd_wallops)
 {
-	const char *message = parc > 1 ? parv[1] : NULL;
+	char *message;
+	message = parc > 1 ? parv[1] : NULL;
 
 	if (BadPtr(message))
 	{
@@ -101,6 +102,10 @@ CMD_FUNC(cmd_wallops)
 	{
 		sendnumeric(client, ERR_NOPRIVILEGES);
 		return;
+	}
+
+	if (MyUser(client)) {
+		sendto_one(client, NULL, ":%s WALLOPS :%s", client->name, message);
 	}
 
 	sendto_wallops(client, ":%s WALLOPS :%s", client->name, message);
