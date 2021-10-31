@@ -28,7 +28,7 @@ ModuleHeader MOD_HEADER
 				"1.0",
 				"Disables remote SAJOIN/SAPART targeted to local users",
 				"Polsaker",
-				"unrealircd-5",
+				"unrealircd-6",
 		};
 
 
@@ -41,9 +41,9 @@ MOD_INIT()
 
 MOD_LOAD()
 {
-	if (!CommandOverrideAdd(modinfo->handle, "SAJOIN", override_sajp))
+	if (!CommandOverrideAdd(modinfo->handle, "SAJOIN", 0, override_sajp))
 		return MOD_FAILED;
-	if (!CommandOverrideAdd(modinfo->handle, "SAPART", override_sajp))
+	if (!CommandOverrideAdd(modinfo->handle, "SAPART", 0, override_sajp))
 		return MOD_FAILED;
 
 
@@ -64,7 +64,7 @@ CMD_OVERRIDE_FUNC(override_sajp)
 		return;
 	}
 
-	if (!(target = find_person(parv[1], NULL)))
+	if (!(target = find_user(parv[1], NULL)))
 	{
 		sendnumeric(client, ERR_NOSUCHNICK, parv[1]);
 		return;

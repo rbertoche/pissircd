@@ -28,7 +28,7 @@ ModuleHeader MOD_HEADER
 	"1.0",
 	"Disables PRIVMSG $*",
 	"Polsaker",
-	"unrealircd-5",
+	"unrealircd-6",
     };
 
 
@@ -41,7 +41,7 @@ MOD_INIT()
 
 MOD_LOAD()
 {
-	if (!CommandOverrideAdd(modinfo->handle, "PRIVMSG", override_privmsg))
+	if (!CommandOverrideAdd(modinfo->handle, "PRIVMSG", 0, override_privmsg))
 		return MOD_FAILED;
 
 
@@ -56,7 +56,10 @@ MOD_UNLOAD()
 CMD_OVERRIDE_FUNC(override_privmsg)
 {
 	char *targetstr, *p;
-	for (p = NULL, targetstr = strtoken(&p, parv[1], ","); targetstr; targetstr = strtoken(&p, NULL, ","))
+	char targets[BUFSIZE];
+
+	strlcpy(targets, parv[1], sizeof(targets));
+	for (p = NULL, targetstr = strtoken(&p, targets, ","); targetstr; targetstr = strtoken(&p, NULL, ","))
 	{
 		if (*targetstr == '$')
 		{

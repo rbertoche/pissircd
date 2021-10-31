@@ -47,7 +47,7 @@ int lr_pre_command(Client *from, MessageTag *mtags, const char *buf);
 int lr_post_command(Client *from, MessageTag *mtags, const char *buf);
 int lr_close_connection(Client *client);
 int lr_packet(Client *from, Client *to, Client *intended_to, char **msg, int *len);
-void lr_new_message(Client *client, MessageTag *recv_mtags, MessageTag **mtag_list, char *signature);
+void lr_new_message(Client *client, MessageTag *recv_mtags, MessageTag **mtag_list, const char *signature);
 void *_labeled_response_save_context(void);
 void _labeled_response_set_context(void *ctx);
 void _labeled_response_force_end(void);
@@ -335,12 +335,12 @@ int lr_packet(Client *from, Client *to, Client *intended_to, char **msg, int *le
 	return 0;
 }
 
-void lr_new_message(Client *client, MessageTag *recv_mtags, MessageTag **mtag_list, char *signature)
+void lr_new_message(Client *client, MessageTag *recv_mtags, MessageTag **mtag_list, const char *signature)
 {
 	/* Locally processed messages already have the label! */
 	if (currentcmd.client) return;
 	MessageTag *m;
-	
+
 	m = find_mtag(recv_mtags, "label");
 	if (m)
 	{
