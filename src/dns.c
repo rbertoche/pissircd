@@ -375,14 +375,17 @@ void unrealdns_cb_nametoip_link(void *arg, int status, int timeouts, struct host
 
 		if (r->ipv4fallback) {
 			/* ipv6-only domain but we couldn't connect over ipv6 and fell back to ipv4 */
-			sendto_ops_and_log("Couldn't connect to server %s.", r->linkblock->servername);
-		 }
+			unreal_log(ULOG_ERROR, "link", "LINK_ERROR_RESOLVING", NULL,
+				   "Couldn't connect to server $link_block.",
+				   log_data_link_block(r->linkblock));
+		}
 		else
 		{
 			/* fatal error while resolving */
-		unreal_log(ULOG_ERROR, "link", "LINK_ERROR_RESOLVING", NULL,
-			   "Unable to resolve hostname $link_block.hostname, when trying to connect to server $link_block.",
-			   log_data_link_block(r->linkblock));
+			unreal_log(ULOG_ERROR, "link", "LINK_ERROR_RESOLVING", NULL,
+				   "Unable to resolve hostname $link_block.hostname, when trying to connect to server $link_block.",
+				   log_data_link_block(r->linkblock));
+		}
 		r->linkblock->refcount--;
 		unrealdns_freeandremovereq(r);
 		return;
