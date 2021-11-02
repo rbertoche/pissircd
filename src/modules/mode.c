@@ -312,8 +312,8 @@ void _do_mode(Channel *channel, Client *client, MessageTag *recv_mtags, int parc
 		{
 			if (IsInvalidChannelTS(sendts))
 			{
-				unreal_log(ULOG_WARNING, "mode", "MODE_INVALID_TIMESTAMP", NULL,
-				           "MODE for channel $channel has invalid timestamp $send_timestamp (from $client.name on $client.user.servername)\n"
+				unreal_log(ULOG_WARNING, "mode", "MODE_INVALID_TIMESTAMP", client,
+				           "MODE for channel $channel has invalid timestamp $send_timestamp (from $client.name)\n"
 				           "Buffer: $modebuf $parabuf",
 				           log_data_channel("channel", channel),
 				           log_data_integer("send_timestamp", sendts),
@@ -1185,7 +1185,7 @@ CMD_FUNC(_cmd_umode)
 				if (IsQuarantined(client->direction))
 				{
 					unreal_log(ULOG_INFO, "mode", "OPER_KILLED_QUARANTINE", client,
-					           "QUARANTINE: Oper $client.detail on server $client.user.servername killed, due to quarantine");
+					           "QUARANTINE: Oper $client.details on server $client.user.servername killed, due to quarantine");
 					sendto_server(NULL, 0, 0, NULL, ":%s KILL %s :Quarantined: no oper privileges allowed", me.id, client->name);
 					exit_client(client, NULL, "Quarantined: no oper privileges allowed");
 					return;
