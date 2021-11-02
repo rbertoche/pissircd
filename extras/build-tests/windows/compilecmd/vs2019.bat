@@ -6,7 +6,7 @@ rem But nowadays we use JOM for parallel builds:
 jom /j32 -f makefile.windows ^
 LIBRESSL_INC_DIR="c:\projects\unrealircd-6-libs\libressl\include" ^
 LIBRESSL_LIB_DIR="c:\projects\unrealircd-6-libs\libressl\lib" ^
-SSLLIB="crypto-46.lib ssl-48.lib" ^
+SSLLIB="crypto-47.lib ssl-50.lib" ^
 USE_REMOTEINC=1 ^
 LIBCURL_INC_DIR="c:\projects\unrealircd-6-libs\curl\include" ^
 LIBCURL_LIB_DIR="c:\projects\unrealircd-6-libs\curl\builds\libcurl-vc-x64-release-dll-ssl-dll-cares-dll-ipv6-obj-lib" ^
@@ -22,6 +22,9 @@ ARGON2LIB="Argon2RefDll.lib" ^
 SODIUM_LIB_DIR="c:\projects\unrealircd-6-libs\libsodium\bin\x64\Release\v142\dynamic" ^
 SODIUM_INC_DIR="c:\projects\unrealircd-6-libs\libsodium\src\libsodium\include" ^
 SODIUMLIB="libsodium.lib" ^
-JANSSON_LIB_DIR="C:\projects\unrealircd-6-libs\jansson\lib" ^
-JANSSON_INC_DIR="C:\projects\unrealircd-6-libs\jansson\include" ^
-JANSSONLIB="jansson.lib" %*
+JANSSON_LIB_DIR="c:\projects\unrealircd-6-libs\jansson\lib" ^
+JANSSON_INC_DIR="c:\projects\unrealircd-6-libs\jansson\include" ^
+JANSSONLIB="jansson.lib" ^
+GEOIPCLASSIC_LIB_DIR="c:\projects\unrealircd-6-libs\GeoIP\libGeoIP" ^
+GEOIPCLASSIC_INC_DIR="c:\projects\unrealircd-6-libs\GeoIP\libGeoIP" ^
+GEOIPCLASSICLIB="GeoIP.lib" %*
