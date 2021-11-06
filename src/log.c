@@ -502,7 +502,10 @@ void json_expand_client(json_t *j, const char *key, Client *client, int detail)
 		snprintf(buf, sizeof(buf), "%s!%s@%s", client->name, client->user->username, client->user->realhost);
 		json_object_set_new(child, "details", json_string_unreal(buf));
 	} else if (client->ip) {
-		snprintf(buf, sizeof(buf), "%s@%s", client->name, client->ip);
+		if (*client->name)
+			snprintf(buf, sizeof(buf), "%s@%s", client->name, client->ip);
+		else
+			snprintf(buf, sizeof(buf), "[%s]", client->ip);
 		json_object_set_new(child, "details", json_string_unreal(buf));
 	} else {
 		json_object_set_new(child, "details", json_string_unreal(client->name));
@@ -1777,6 +1780,7 @@ void postconf_defaults_log_block(void)
 	ls = add_log_source("!kick.LOCAL_CLIENT_KICK");
 	AppendListItem(ls, l->sources);
 	ls = add_log_source("!kick.REMOTE_CLIENT_KICK");
+	AppendListItem(ls, l->sources);
 }
 
 void log_blocks_switchover(void)

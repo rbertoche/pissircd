@@ -683,7 +683,7 @@ void chmode_str(struct ChMode *modes, char *mbuf, char *pbuf, size_t mbuf_size, 
 	*mbuf=0;
 }
 
-char *channellevel_to_string(const char *s)
+const char *channellevel_to_string(const char *s)
 {
 	/* Requested at http://bugs.unrealircd.org/view.php?id=3852 */
 	if (!strcmp(s, "none"))
@@ -699,7 +699,7 @@ char *channellevel_to_string(const char *s)
 	if (!strcmp(s, "owner") || !strcmp(s, "chanowner"))
 		return "q";
 
-	return ""; /* unknown or unsupported */
+	return NULL; /* unknown or unsupported */
 }
 
 Policy policy_strtoval(const char *s)
@@ -7109,7 +7109,28 @@ int	_conf_set(ConfigFile *conf, ConfigEntry *ce)
 			safe_strdup(tempiConf.oper_snomask, cep->value);
 		}
 		else if (!strcmp(cep->name, "level-on-join")) {
-			safe_strdup(tempiConf.level_on_join, channellevel_to_string(cep->value));
+			const char *res = channellevel_to_string(cep->value); /* 'halfop', etc */
+			if (!res)
+			{
+				/* This check needs to be here, in config run, because
+				 * now the channel modules are initialized and we know
+				 * which ones are available. This same information is
+				 * not available during config test, so we can't test
+				 * for it there like we normally do.
+				 */
+				if (!valid_channel_access_mode_letter(*cep->value))
+				{
+					config_warn("%s:%d: set::level-on-join: Unknown mode (access level) '%c'. "
+					            "That mode does not exist or is not a valid access mode "
+					            "like vhoaq.",
+					            cep->file->filename, cep->line_number,
+					            *cep->value);
+					config_warn("Falling back to to set::level-on-join none; now. "
+					            "This is probably not what you want!!!");
+				}
+				res = cep->value; /* if we reach this.. then it is a single letter */
+			}
+			safe_strdup(tempiConf.level_on_join, res);
 		}
 		else if (!strcmp(cep->name, "static-quit")) {
 			safe_strdup(tempiConf.static_quit, cep->value);
@@ -7706,7 +7727,6 @@ int	_test_set(ConfigFile *conf, ConfigEntry *ce)
 						cep->file->filename, cep->line_number, *p);
 					errors++;
 				}
-			set_usermode(cep->value);
 		}
 		else if (!strcmp(cep->name, "modes-on-join")) {
 			char *c;
@@ -7760,10 +7780,11 @@ int	_test_set(ConfigFile *conf, ConfigEntry *ce)
 		else if (!strcmp(cep->name, "level-on-join")) {
 			CheckNull(cep);
 			CheckDuplicate(cep, level_on_join, "level-on-join");
-			if (BadPtr(channellevel_to_string(cep->value)))
+			if (!channellevel_to_string(cep->value) && (strlen(cep->value) != 1))
 			{
-				config_error("%s:%i: set::level-on-join: unknown value '%s', should be one of: none, voice, halfop, op, admin, owner",
-					cep->file->filename, cep->line_number, cep->value);
+				config_error("%s:%i: set::level-on-join: unknown value '%s', should be one of: "
+				             "'none', 'voice', 'halfop', 'op', 'admin', 'owner', or a single letter (eg 'o')",
+				             cep->file->filename, cep->line_number, cep->value);
 				errors++;
 			}
 		}
@@ -10586,7 +10607,7 @@ int add_config_resource(const char *resource, int type, ConfigEntry *ce)
 		/* Existing entry, add us to the list of
 		 * items who are interested in this resource ;)
 		 */
-		AddListItem(rs->wce, wce);
+		AddListItem(wce, rs->wce);
 		return 0;
 	}
 
