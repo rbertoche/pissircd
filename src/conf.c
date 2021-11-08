@@ -1985,8 +1985,13 @@ int config_read_start(void)
 		return -1;
 	}
 
+	/* We set this to 1 because otherwise we may call rehash_internal()
+	 * already from config_read_file() which is too soon (race).
+	 */
+	loop.rehash_download_busy = 1;
 	add_config_resource(configfile, RESOURCE_INCLUDE, NULL);
 	ret = config_read_file(configfile, configfile);
+	loop.rehash_download_busy = 0;
 	if (ret < 0)
 	{
 		config_load_failed();
@@ -1998,6 +2003,9 @@ int config_read_start(void)
 int is_config_read_finished(void)
 {
 	ConfigResource *rs;
+
+	if (loop.rehash_download_busy)
+		return 0;
 
 	for (rs = config_resources; rs; rs = rs->next)
 	{
@@ -10629,7 +10637,42 @@ int add_config_resource(const char *resource, int type, ConfigEntry *ce)
 		cache_file = unreal_mkcache(rs->url);
 		modtime = unreal_getfilemodtime(cache_file);
 		if (modtime > 0)
+		{
 			safe_strdup(rs->cache_file, cache_file); /* Cached copy is available */
+			/* Check if there is an "url-refresh" argument */
+			ConfigEntry *cep, *prev = NULL;
+			for (cep = ce->items; cep; cep = cep->next)
+			{
+				if (!strcmp(cep->name, "url-refresh"))
+				{
+					/* First find out the time value of url-refresh... (eg '7d' -> 86400*7) */
+					long refresh_time = 0;
+					if (cep->value)
+						refresh_time = config_checkval(cep->value, CFG_TIME);
+					/* Then remove the config item so it is not seen by the rest of unrealircd.
+					 * Can't use DelListItem() here as ConfigEntry has no ->prev, only ->next.
+					 */
+					if (prev)
+						prev->next = cep->next; /* (skip over us) */
+					else
+						ce->items = cep->next; /* (new head) */
+					/* ..and free it */
+					config_entry_free(cep);
+					/* And now check if the current cached copy is recent enough */
+					if (TStime() - modtime < refresh_time)
+					{
+						/* Don't download, use cached copy */
+						//config_status("DEBUG: using cached copy due to url-refresh %ld", refresh_time);
+						resource_download_complete(rs->url, NULL, NULL, 1, rs);
+						return 1;
+					} else {
+						//config_status("DEBUG: requires download attempt, out of date url-refresh %ld < %ld", refresh_time, TStime() - modtime);
+					}
+					break; // MUST break now as we touched the linked list.
+				}
+				prev = cep;
+			}
+		}
 		download_file_async(rs->url, modtime, resource_download_complete, (void *)rs, NULL, DOWNLOAD_MAX_REDIRECTS);
 	}
 	return 1;
