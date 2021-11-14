@@ -132,11 +132,9 @@ CMD_FUNC(cmd_protoctl)
 			 */
 			if (strstr(charsys_get_current_languages(), "utf8") && !strstr(value, "utf8"))
 			{
-				unreal_log(ULOG_ERROR, "link", "LINK_DENIED_CHARSYS_INCOMPATIBLE", client,
-					   "Server link $client rejected. Server $me_name has utf8 in set::allowed-nickchars but $client does not.",
-					   log_data_string("me_name", me.name));
-				exit_client(client, NULL, "Incompatible set::allowed-nickchars setting");
-				return;
+				unreal_log(ULOG_WARNING, "link", "LINK_WARNING_CHARSYS", client,
+					   "Server $client has utf8 in set::allowed-nickchars but %me does not. Proceed with caution.",
+					   log_data_string("me", me.name));
 			}
 			/* We compare the character sets to see if we should warn opers about any mismatch... */
 			if (strcmp(value, charsys_get_current_languages()))

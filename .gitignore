@@ -25,6 +25,7 @@ tags
 # Ignore editor files
 *\#*
 *~
+.dir-locals.el
 
 # Ignore SSL Stuff
 server.cert.pem
