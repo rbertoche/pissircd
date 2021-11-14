@@ -1447,6 +1447,7 @@ struct ConfigEntry
 	int section_linenumber;		/**< Line number of the section (only used internally for parse errors) */
 	ConfigEntry *parent;		/**< Parent item, can be NULL */
 	ConditionalConfig *conditional_config;	/**< Used for conditional config by the main parser */
+	unsigned escaped:1;
 };
 
 struct ConfigFlag 
@@ -1604,6 +1605,7 @@ struct ConfigItem_oper {
 	unsigned long modes, require_modes;
 	char *vhost;
 	int maxlogins;
+	int server_notice_colors;
 };
 
 /** The TLS options that are used in set::tls and otherblocks::tls-options.

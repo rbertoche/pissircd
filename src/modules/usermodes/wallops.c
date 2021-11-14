@@ -104,9 +104,7 @@ CMD_FUNC(cmd_wallops)
 		return;
 	}
 
-	if (MyUser(client)) {
+	sendto_wallops(client->direction, client, ":%s WALLOPS :%s", client->name, message);
+	if (MyUser(client))
 		sendto_one(client, NULL, ":%s WALLOPS :%s", client->name, message);
-	}
-
-	sendto_wallops(client, ":%s WALLOPS :%s", client->name, message);
 }
