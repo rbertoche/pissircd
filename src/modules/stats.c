@@ -530,7 +530,8 @@ int stats_oper(Client *client, const char *para)
 	  		sendnumeric(client, RPL_STATSOLINE,
 	  			'O', m->mask, oper_p->name,
 	  			"-",
-	  			oper_p->class->name? oper_p->class->name : "");
+	  			oper_p->class->name? oper_p->class->name : "",
+				oper_p->operclass? oper_p->operclass: "");
 		}
 	}
 	return 0;
