@@ -13,6 +13,36 @@ SCRIPTDIR="@SCRIPTDIR@"
 DOCDIR="@DOCDIR@"
 TMPDIR="@TMPDIR@"
 
+function pisser_warn()
+{
+	BRANCH="`git branch --show-current`"
+	if [ "$BRANCH" != "piss60" -a \
+		"$BRANCH" != "unreal60" ]; then
+		echo "I don't know what branch this is, but anyway expect a vanilla unrealircd"
+		echo "upgrade after this."
+		echo
+	else
+		echo
+		echo "Hello pisser."
+		echo "Running this script successfully will result in the removal of "
+		echo "all piss from your server. That includes the patch for emojis "
+		echo "on nick and all other changes to unrealircd made on branches at "
+		echo "pissnet/pissircd."
+		echo "That is so because currently there is not a similar upgrade "
+		echo "implementation and service that builds from our branches."
+		echo "Of course you will be able to link to pissnet with either."
+		echo -e "- rb\U1F431r"
+		echo
+	fi
+
+	echo are you sure you wanna continu? \(y/n\)
+	read i
+	if [ "$i" != "y" ]; then
+		exit 0
+	fi
+	unset BRANCH
+}
+
 function warn()
 {
 	echo
@@ -63,6 +93,8 @@ if ! wget --help 1>/dev/null 2>&1; then
 	echo "https://www.unrealircd.org/docs/Upgrading"
 	exit 1
 fi
+
+pisser_warn
 
 # Weird way to get version, but ok.
 cd "$BUILDDIR" || fail "Could not cd to builddir"
