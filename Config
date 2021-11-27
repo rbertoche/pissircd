@@ -77,6 +77,9 @@ fi
 if [ "$GEOIP" = "libmaxminddb" ]; then
 	ARG="$ARG--enable-libmaxminddb "
 fi
+if [ "$SANITIZER" = "asan" ]; then
+	ARG="$ARG--enable-asan "
+fi
 ARG="$ARG $EXTRAPARA "
 CONF="./configure $ARG"
 # remove possibly old instances of curl in ~/unrealircd/lib/
@@ -251,6 +254,7 @@ NOOPEROVERRIDE=""
 OPEROVERRIDEVERIFY=""
 GENCERTIFICATE="1"
 EXTRAPARA=""
+SANITIZER=""
 GEOIP="classic"
 if [ "`eval echo -n 'a'`" = "-n a" ] ; then
 	c="\c"
@@ -345,7 +349,7 @@ echo "We will now ask you a number of questions. You can just press ENTER to acc
 echo ""
 
 # This needs to be updated each release so auto-upgrading works for settings, modules, etc!!:
-UNREALRELEASES="unrealircd-6.0.0-beta3 unrealircd-6.0.0-beta2 unrealircd-6.0.0-beta1 unrealircd-5.2.2 unrealircd-5.2.1.1 unrealircd-5.2.1 unrealircd-5.2.1-rc1 unrealircd-5.2.0.2 unrealircd-5.2.0.1 unrealircd-5.2.0 unrealircd-5.2.0-rc1 unrealircd-5.0.9.1 unrealircd-5.0.9 unrealircd-5.0.9-rc1 unrealircd-5.0.8 unrealircd-5.0.8-rc1 unrealircd-5.0.7 unrealircd-5.0.7-rc1 unrealircd-5.0.6 unrealircd-5.0.5.1 unrealircd-5.0.5 unrealircd-5.0.4 unrealircd-5.0.3.1 unrealircd-5.0.3 unrealircd-5.0.2"
+UNREALRELEASES="unrealircd-6.0.0-beta4 unrealircd-6.0.0-beta3 unrealircd-6.0.0-beta2 unrealircd-6.0.0-beta1 unrealircd-5.2.2 unrealircd-5.2.1.1 unrealircd-5.2.1 unrealircd-5.2.1-rc1 unrealircd-5.2.0.2 unrealircd-5.2.0.1 unrealircd-5.2.0 unrealircd-5.2.0-rc1 unrealircd-5.0.9.1 unrealircd-5.0.9 unrealircd-5.0.9-rc1 unrealircd-5.0.8 unrealircd-5.0.8-rc1 unrealircd-5.0.7 unrealircd-5.0.7-rc1 unrealircd-5.0.6 unrealircd-5.0.5.1 unrealircd-5.0.5 unrealircd-5.0.4 unrealircd-5.0.3.1"
 if [ -f "config.settings" ]; then
 	. ./config.settings
 else
@@ -756,6 +760,42 @@ if [ -n "$ADVANCED" ] ; then
 	RUN_ADVANCED
 fi
 
+TEST=""
+while [ -z "$TEST" ] ; do
+	if [ "$SANITIZER" = "asan" ] ; then
+		TEST="Yes"
+	else
+		TEST="No"
+	fi
+	echo ""
+	echo "Are you running UnrealIRCd as a test, debugging a problem or developing a module?"
+	echo "Then it is possible to run with AddressSanitizer enabled. This will make it"
+	echo "catch bugs such as out-of-bounds and other memory corruption issues, which can"
+	echo "be really helpful in some cases. The downside is that it will consume a lot"
+	echo "more memory and run slower too. So, only answer 'Yes' if you are OK with this."
+	echo "Also, on some systems (notably FreeBSD), when you enable AddressSanitizer,"
+	echo "UnrealIRCd may fail to start. So when in doubt, answer 'No'."
+	echo "Do you want to enable AddressSanitizer?"
+	echo $n "[$TEST] -> $c"
+	read cc
+	if [ -z "$cc" ] ; then
+		cc=$TEST
+	fi
+	case "$cc" in
+	[Yy]*)
+		SANITIZER="asan"
+		;;
+	[Nn]*)
+		SANITIZER=""
+		;;
+	*)
+		echo ""
+		echo "You must enter either Yes or No"
+		TEST=""
+		;;
+	esac
+done
+
 TEST="$EXTRAPARA"
 echo ""
 echo "Would you like to pass any custom parameters to configure?"
@@ -797,6 +837,7 @@ CURLDIR="$CURLDIR"
 NOOPEROVERRIDE="$NOOPEROVERRIDE"
 OPEROVERRIDEVERIFY="$OPEROVERRIDEVERIFY"
 GENCERTIFICATE="$GENCERTIFICATE"
+SANITIZER="$SANITIZER"
 EXTRAPARA="$EXTRAPARA"
 ADVANCED="$ADVANCED"
 __EOF__
