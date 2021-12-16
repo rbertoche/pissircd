@@ -116,7 +116,6 @@ if [ "x$MAKE" = "x" ]; then
 fi
 
 echo $CONF
-./autogen.sh
 $CONF || exit 1
 cd "$UNREALCWD"
 
