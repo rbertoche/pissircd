@@ -1,6 +1,6 @@
 #!/bin/bash
 echo "Regenerating 'configure' and headers..."
-echo "NOTE: If you are not an UnrealIRCd developers you might want to run ./Config"
+echo "NOTE: If you are not an UnrealIRCd developer you might want to run ./Config"
 
 cd "$(dirname "${0}")"
 
