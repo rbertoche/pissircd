@@ -1,6 +1,44 @@
-UnrealIRCd 6.0.0
+UnrealIRCd 6.0.2-git
 =================
-This is the first stable release of UnrealIRCd 6.
+*THIS IS WORK IN PROGRESS*
+
+You are looking at the git version of UnrealIRCd, bleeding edge.
+
+Enhancements:
+* Support for [logging to a channel](https://www.unrealircd.org/docs/Log_block#Logging_to_a_channel).
+  Similar to snomasks but then for channels.
+* New option [set::server-notice-show-event](https://www.unrealircd.org/docs/Set_block#set::server-notice-show-event)
+  which can be set to `no` to hide the event information (eg `connect.LOCAL_CLIENT_CONNECT`)
+  in server notices. This can be overriden per-oper in the
+  [Oper block](https://www.unrealircd.org/docs/Oper_block) via oper::server-notice-show-event.
+
+UnrealIRCd 6.0.1.1
+-------------------
+If you are already running UnrealIRCd 6 then read below on the 
+changes between 6.0.0 and 6.0.1(.1). Otherwise, jump straight to the
+[summary about UnrealIRCd 6](#Summary) to learn more about UnrealIRCd 6.
+
+Fixes:
+* In 6.0.1.1: extended bans were not properly synced between U5 and U6.
+  This caused missing extended bans on the U5 side (MODE was working OK,
+  this only happened when linking servers)
+* Text extbans did not have any effect (`+b ~text:censor:*badword*`)
+* Timed bans were not expiring if all servers on the network were on U6
+* Channel mode `+f` could place a timed extban with `~t` instead of `~time`
+* Crash when unloading any of the vhoaq modules at runtime
+* `./unrealircd upgrade` not working on FreeBSD and not with self-compiled cURL
+* Some log messages being wrong (`CHGIDENT`, `CHGNAME`)
+* Remove confusing high cpu load warning
+
+Enhancements:
+* Error on unknown snomask in set::snomask-on-oper and oper::snomask.
+* TKL add/remove/expire messages now show `[duration: 60m]` instead of
+  the `[expires: ZZZ GMT]` string since that is what people are more
+  interested in and is not affected by time zones. The format in all the
+  3 notices is also consistent now.
+
+UnrealIRCd 6.0.0
+-----------------
 
 Many thanks to k4be for his help during development, other contributors for
 their feedback and patches, the people who tested the beta's and release
@@ -31,7 +69,7 @@ security issues will be fixed. Finally, after July 1, 2023,
 
 If you want to hold off for a while because you are cautious or if you
 depend on 3rd party modules (which may not have been upgraded yet by their
-authors) then feel free to wait for a 6.0.1 or 6.0.2 release.
+authors) then feel free to wait a while.
 
 If you are upgrading from UnrealIRCd 5 to 6 then you can use your existing
 configuration and files. There's no need to start from scratch.

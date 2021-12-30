@@ -263,12 +263,18 @@ typedef struct Log Log;
 struct Log {
 	Log *prev, *next;
 	LogSource *sources;
+	int type;
 	char destination[CHANNELLEN+1];
+	int show_event;
+	/* for destination::file */
 	char *file;
 	char *filefmt;
 	long maxsize;
-	int type;
 	int logfd;
+	/* for destination::channel */
+	int color;
+	int json_message_tag;
+	int oper_only;
 };
 
 /** This is used for deciding the <index> in logs[<index>] and temp_logs[<index>] */
@@ -1606,6 +1612,7 @@ struct ConfigItem_oper {
 	char *vhost;
 	int maxlogins;
 	int server_notice_colors;
+	int server_notice_show_event;
 };
 
 /** The TLS options that are used in set::tls and otherblocks::tls-options.

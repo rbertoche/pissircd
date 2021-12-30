@@ -28,7 +28,7 @@
 #include "unrealircd.h"
 
 // TODO: Make configurable at compile time (runtime won't do, as we haven't read the config file)
-#define show_event_id_console 0
+#define show_event_console 0
 
 /* Variables */
 Log *logs[NUM_LOG_DESTINATIONS] = { NULL, NULL, NULL, NULL, NULL };
@@ -36,6 +36,7 @@ Log *temp_logs[NUM_LOG_DESTINATIONS] = { NULL, NULL, NULL, NULL, NULL };
 static int snomask_num_destinations = 0;
 
 static char snomasks_in_use[257] = { '\0' };
+static char snomasks_in_use_testing[257] = { '\0' };
 
 /* Forward declarations */
 int log_sources_match(LogSource *logsource, LogLevel loglevel, const char *subsystem, const char *event_id, int matched_already);
@@ -185,7 +186,7 @@ int config_test_log(ConfigFile *conf, ConfigEntry *block)
 				/* TODO: Validate the sources lightly for formatting issues */
 				any_sources = 1;
 			}
-		}
+		} else
 		if (!strcmp(ce->name, "destination"))
 		{
 			for (cep = ce->items; cep; cep = cep->next)
@@ -205,6 +206,8 @@ int config_test_log(ConfigFile *conf, ConfigEntry *block)
 						config_error("%s:%d: snomask must be a single letter",
 							cep->file->filename, cep->line_number);
 						errors++;
+					} else {
+						strlcat(snomasks_in_use_testing, cep->value, sizeof(snomasks_in_use_testing));
 					}
 				} else
 				if (!strcmp(cep->name, "channel"))
@@ -221,6 +224,22 @@ int config_test_log(ConfigFile *conf, ConfigEntry *block)
 						config_error("%s:%d: Invalid channel name '%s'",
 							cep->file->filename, cep->line_number, cep->value);
 						errors++;
+					}
+					for (cepp = cep->items; cepp; cepp = cepp->next)
+					{
+						if (!strcmp(cepp->name, "color"))
+							;
+						else if (!strcmp(cepp->name, "show-event"))
+							;
+						else if (!strcmp(cepp->name, "json-message-tag"))
+							;
+						else if (!strcmp(cepp->name, "oper-only"))
+							;
+						else
+						{
+							config_error_unknown(cepp->file->filename, cepp->line_number, "log::destination::channel", cepp->name);
+							errors++;
+						}
 					}
 				} else
 				if (!strcmp(cep->name, "file"))
@@ -305,6 +324,10 @@ int config_test_log(ConfigFile *conf, ConfigEntry *block)
 					continue;
 				}
 			}
+		} else
+		{
+			config_error_unknown(ce->file->filename, ce->line_number, "log", ce->name);
+			errors++;
 		}
 	}
 
@@ -390,6 +413,23 @@ int config_run_log(ConfigFile *conf, ConfigEntry *block)
 					strlcpy(log->destination, cep->value, sizeof(log->destination)); /* destination is the channel */
 					log->sources = sources;
 					AddListItem(log, temp_logs[LOG_DEST_CHANNEL]);
+					/* set defaults */
+					log->color = tempiConf.server_notice_colors;
+					log->show_event = tempiConf.server_notice_show_event;
+					log->json_message_tag = 1;
+					log->oper_only = 1;
+					/* now parse options (if any) */
+					for (cepp = cep->items; cepp; cepp = cepp->next)
+					{
+						if (!strcmp(cepp->name, "color"))
+							log->color = config_checkval(cepp->value, CFG_YESNO);
+						else if (!strcmp(cepp->name, "show-event"))
+							log->show_event = config_checkval(cepp->value, CFG_YESNO);
+						else if (!strcmp(cepp->name, "json-message-tag"))
+							log->json_message_tag = config_checkval(cepp->value, CFG_YESNO);
+						else if (!strcmp(cepp->name, "oper-only"))
+							log->oper_only = config_checkval(cepp->value, CFG_YESNO);
+					}
 				} else
 				if (!strcmp(cep->name, "remote"))
 				{
@@ -496,6 +536,10 @@ void json_expand_client(json_t *j, const char *key, Client *client, int detail)
 
 	/* same for ip, is there for all (well, some services pseudo-users may not have one) */
 	json_object_set_new(child, "ip", json_string_unreal(client->ip));
+	if (client->local && client->local->listener)
+		json_object_set_new(child, "server_port", json_integer(client->local->listener->port));
+	if (client->local && client->local->port)
+		json_object_set_new(child, "client_port", json_integer(client->local->port));
 
 	/* client.details is always available: it is nick!user@host, nick@host, server@host
 	 * server@ip, or just server.
@@ -876,11 +920,13 @@ LogData *log_data_tkl(const char *key, TKL *tkl)
 	if (tkl->expire_at <= 0)
 	{
 		json_object_set_new(j, "expire_at_string", json_string_unreal("Never"));
+		json_object_set_new(j, "duration_string", json_string_unreal("permanent"));
 	} else {
 		*buf = '\0';
 		short_date(tkl->expire_at, buf);
 		strlcat(buf, " GMT", sizeof(buf));
 		json_object_set_new(j, "expire_at_string", json_string_unreal(buf));
+		json_object_set_new(j, "duration_string", json_string_unreal(pretty_time_val_r(buf, sizeof(buf), tkl->expire_at - tkl->set_at)));
 	}
 	json_object_set_new(j, "set_at_delta", json_integer(TStime() - tkl->set_at));
 	if (TKLIsServerBan(tkl))
@@ -1166,14 +1212,14 @@ void do_unreal_log_disk(LogLevel loglevel, const char *subsystem, const char *ev
 		for (m = msg; m; m = m->next)
 		{
 #ifdef _WIN32
-			if (show_event_id_console)
+			if (show_event_console)
 				win_log("* %s.%s%s [%s] %s\n", subsystem, event_id, m->next?"+":"", log_level_valtostring(loglevel), m->line);
 			else
 				win_log("* [%s] %s\n", log_level_valtostring(loglevel), m->line);
 #else
 			if (terminal_supports_color())
 			{
-				if (show_event_id_console)
+				if (show_event_console)
 				{
 					fprintf(stderr, "%s%s.%s%s %s[%s]%s %s\n",
 							log_level_terminal_color(ULOG_INVALID), subsystem, event_id, TERMINAL_COLOR_RESET,
@@ -1185,7 +1231,7 @@ void do_unreal_log_disk(LogLevel loglevel, const char *subsystem, const char *ev
 							m->line);
 				}
 			} else {
-				if (show_event_id_console)
+				if (show_event_console)
 					fprintf(stderr, "%s.%s%s [%s] %s\n", subsystem, event_id, m->next?"+":"", log_level_valtostring(loglevel), m->line);
 				else
 					fprintf(stderr, "[%s] %s\n", log_level_valtostring(loglevel), m->line);
@@ -1418,13 +1464,66 @@ const char *log_to_snomask(LogLevel loglevel, const char *subsystem, const char 
 
 #define COLOR_NONE "\xf"
 #define COLOR_DARKGREY "\00314"
-/** Do the actual writing to log files */
+
+/** Generic sendto function for logging to IRC. Used for notices to IRCOps and also for sending to individual users on channels */
+void sendto_log(Client *client, const char *msgtype, const char *destination, int show_colors, int show_event,
+                LogLevel loglevel, const char *subsystem, const char *event_id, MultiLine *msg, const char *json_serialized, Client *from_server)
+{
+	MultiLine *m;
+
+	for (m = msg; m; m = m->next)
+	{
+		MessageTag *mtags = NULL;
+		new_message(from_server, NULL, &mtags);
+
+		/* Add JSON data, but only if it is the first message (m == msg) */
+		if (json_serialized && (m == msg))
+		{
+			MessageTag *json_mtag = safe_alloc(sizeof(MessageTag));
+			safe_strdup(json_mtag->name, "unrealircd.org/json-log");
+			safe_strdup(json_mtag->value, json_serialized);
+			AddListItem(json_mtag, mtags);
+		}
+
+		if (show_colors)
+		{
+			if (show_event)
+			{
+				sendto_one(client, mtags, ":%s %s %s :%s%s.%s%s%s %s[%s]%s %s",
+					from_server->name, msgtype, destination,
+					COLOR_DARKGREY, subsystem, event_id, m->next?"+":"", COLOR_NONE,
+					log_level_irc_color(loglevel), log_level_valtostring(loglevel), COLOR_NONE,
+					m->line);
+			} else {
+				sendto_one(client, mtags, ":%s %s %s :%s[%s]%s %s",
+					from_server->name, msgtype, destination,
+					log_level_irc_color(loglevel), log_level_valtostring(loglevel), COLOR_NONE,
+					m->line);
+			}
+		} else {
+			if (show_event)
+			{
+				sendto_one(client, mtags, ":%s %s %s :%s.%s%s [%s] %s",
+					from_server->name, msgtype, destination,
+					subsystem, event_id, m->next?"+":"",
+					log_level_valtostring(loglevel),
+					m->line);
+			} else {
+				sendto_one(client, mtags, ":%s %s %s :[%s] %s",
+					from_server->name, msgtype, destination,
+					log_level_valtostring(loglevel),
+					m->line);
+			}
+		}
+		safe_free_message_tags(mtags);
+	}
+}
+
+/** Send server notices to IRCOps */
 void do_unreal_log_opers(LogLevel loglevel, const char *subsystem, const char *event_id, MultiLine *msg, const char *json_serialized, Client *from_server)
 {
 	Client *client;
 	const char *snomask_destinations, *p;
-	MessageTag *mtags = NULL, *mtags_loop;
-	MultiLine *m;
 
 	/* If not fully booted then we don't have a logging to snomask mapping so can't do much.. */
 	if (!loop.booted)
@@ -1438,20 +1537,13 @@ void do_unreal_log_opers(LogLevel loglevel, const char *subsystem, const char *e
 	if (!snomask_destinations)
 		return;
 
-	/* Prepare message tag for those who have CAP unrealircd.org/json-log */
-	if (json_serialized)
-	{
-		mtags = safe_alloc(sizeof(MessageTag));
-		safe_strdup(mtags->name, "unrealircd.org/json-log");
-		safe_strdup(mtags->value, json_serialized);
-	}
-
 	/* To specific snomasks... */
 	list_for_each_entry(client, &oper_list, special_node)
 	{
 		const char *operlogin;
 		ConfigItem_oper *oper;
-		int colors = iConf.server_notice_colors;
+		int show_colors = iConf.server_notice_colors;
+		int show_event = iConf.server_notice_show_event;
 
 		if (snomask_destinations)
 		{
@@ -1472,30 +1564,56 @@ void do_unreal_log_opers(LogLevel loglevel, const char *subsystem, const char *e
 
 		operlogin = get_operlogin(client);
 		if (operlogin && (oper = find_oper(operlogin)))
-			colors = oper->server_notice_colors;
-
-		mtags_loop = mtags;
-		for (m = msg; m; m = m->next)
 		{
-			if (colors)
-			{
-				sendto_one(client, mtags_loop, ":%s NOTICE %s :%s%s.%s%s%s %s[%s]%s %s",
-					from_server->name, client->name,
-					COLOR_DARKGREY, subsystem, event_id, m->next?"+":"", COLOR_NONE,
-					log_level_irc_color(loglevel), log_level_valtostring(loglevel), COLOR_NONE,
-					m->line);
-			} else {
-				sendto_one(client, mtags_loop, ":%s NOTICE %s :%s.%s%s [%s] %s",
-					from_server->name, client->name,
-					subsystem, event_id, m->next?"+":"",
-					log_level_valtostring(loglevel),
-					m->line);
-			}
-			mtags_loop = NULL; /* this way we only send the JSON in the first msg */
+			show_colors = oper->server_notice_colors;
+			show_event = oper->server_notice_show_event;
+		}
+
+		sendto_log(client, "NOTICE", client->name, show_colors, show_event, loglevel, subsystem, event_id, msg, json_serialized, from_server);
+	}
+}
+
+/** Send server notices to channels */
+void do_unreal_log_channels(LogLevel loglevel, const char *subsystem, const char *event_id, MultiLine *msg, const char *json_serialized, Client *from_server)
+{
+	Log *l;
+	Member *m;
+	Client *client;
+
+	/* If not fully booted then we don't have a logging to snomask mapping so can't do much.. */
+	if (!loop.booted)
+		return;
+
+	/* Never send these */
+	if (!strcmp(subsystem, "rawtraffic"))
+		return;
+
+	for (l = logs[LOG_DEST_CHANNEL]; l; l = l->next)
+	{
+		const char *operlogin;
+		ConfigItem_oper *oper;
+		Channel *channel;
+
+		if (!log_sources_match(l->sources, loglevel, subsystem, event_id, 0))
+			continue;
+
+		channel = find_channel(l->destination);
+		if (!channel)
+			continue;
+
+		for (m = channel->members; m; m = m->next)
+		{
+			Client *client = m->client;
+			if (!MyUser(client))
+				continue;
+			if (l->oper_only && !IsOper(client))
+				continue;
+			sendto_log(client, "PRIVMSG", channel->name, l->color, l->show_event,
+			           loglevel, subsystem, event_id, msg,
+			           l->json_message_tag ? json_serialized : NULL,
+			           from_server);
 		}
 	}
-
-	safe_free_message_tags(mtags);
 }
 
 void do_unreal_log_remote(LogLevel loglevel, const char *subsystem, const char *event_id, MultiLine *msg, const char *json_serialized)
@@ -1699,6 +1817,8 @@ void do_unreal_log_internal(LogLevel loglevel, const char *subsystem, const char
 		from_server = &me;
 	do_unreal_log_opers(loglevel, subsystem, event_id, mmsg, json_serialized, from_server);
 
+	do_unreal_log_channels(loglevel, subsystem, event_id, mmsg, json_serialized, from_server);
+
 	do_unreal_log_remote(loglevel, subsystem, event_id, mmsg, json_serialized);
 
 	// NOTE: code duplication further down!
@@ -1720,8 +1840,9 @@ void do_unreal_log_internal_from_remote(LogLevel loglevel, const char *subsystem
 	/* Call the disk loggers */
 	do_unreal_log_disk(loglevel, subsystem, event_id, msg, json_serialized);
 
-	/* And the ircops stuff */
+	/* And to IRC */
 	do_unreal_log_opers(loglevel, subsystem, event_id, msg, json_serialized, from_server);
+	do_unreal_log_channels(loglevel, subsystem, event_id, msg, json_serialized, from_server);
 
 	unreal_log_recursion_trap = 0;
 }
@@ -1801,6 +1922,12 @@ void postconf_defaults_log_block(void)
 	AppendListItem(ls, l->sources);
 }
 
+/* Called before CONFIG_TEST */
+void log_pre_rehash(void)
+{
+	*snomasks_in_use_testing = '\0';
+}
+
 /* Called after CONFIG_TEST right before CONFIG_RUN */
 void config_pre_run_log(void)
 {
@@ -1825,4 +1952,36 @@ void log_blocks_switchover(void)
 int is_valid_snomask(char c)
 {
 	return strchr(snomasks_in_use, c) ? 1 : 0;
+}
+
+/** Check if a letter is a valid snomask during or after CONFIG_TEST
+ * (the snomasks exist in the log block configuration read during config_test).
+ * @param c	the snomask letter to check
+ * @returns	1 if exists, 0 if not.
+ */
+int is_valid_snomask_testing(char c)
+{
+	return strchr(snomasks_in_use_testing, c) ? 1 : 0;
+}
+
+/** Check if a string all consists of valid snomasks during or after CONFIG_TEST
+ * (the snomasks exist in the log block configuration read during config_test).
+ * @param str			the snomask string to check
+ * @param invalid_snomasks	list of unknown snomask letters
+ * @returns			1 if exists, 0 if not.
+ */
+int is_valid_snomask_string_testing(const char *str, char **invalid_snomasks)
+{
+	static char invalid_snomasks_buf[256];
+
+	*invalid_snomasks_buf = '\0';
+	for (; *str; str++)
+	{
+		if ((*str == '+') || (*str == '-'))
+			continue;
+		if (!strchr(snomasks_in_use_testing, *str))
+			strlcat_letter(invalid_snomasks_buf, *str, sizeof(invalid_snomasks_buf));
+	}
+	*invalid_snomasks = invalid_snomasks_buf;
+	return *invalid_snomasks_buf ? 0 : 1;
 }

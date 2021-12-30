@@ -246,6 +246,7 @@ MODVAR int			config_error_flag = 0;
 int			config_verbose = 0;
 
 int need_operclass_permissions_upgrade = 0;
+int invalid_snomasks_encountered = 0;
 int have_tls_listeners = 0;
 char *port_6667_ip = NULL;
 
@@ -1644,6 +1645,7 @@ void config_setdefaultsettings(Configuration *i)
 
 	safe_strdup(i->oper_snomask, OPER_SNOMASKS);
 	i->server_notice_colors = 1;
+	i->server_notice_show_event = 1;
 	i->ident_read_timeout = 7;
 	i->ident_connect_timeout = 3;
 	i->ban_version_tkl_time = 86400; /* 1d */
@@ -1893,11 +1895,6 @@ void applymeblock(void)
 		strlcpy(me.id, conf_me->sid, sizeof(me.id));
 }
 
-/** Reset config tests (before running the config test) */
-void config_test_reset(void)
-{
-}
-
 /** Run config test and all post config tests. */
 int config_test_all(void)
 {
@@ -2049,6 +2046,7 @@ int config_test(void)
 	memset(&nicklengths, 0, sizeof(nicklengths));
 	config_setdefaultsettings(&tempiConf);
 	clicap_pre_rehash();
+	log_pre_rehash();
 	free_config_defines();
 
 	if (!config_loadmodules())
@@ -2058,8 +2056,6 @@ int config_test(void)
 	}
 
 	preprocessor_resolve_conditionals_all(PREPROCESSOR_PHASE_MODULE);
-
-	config_test_reset();
 
 	if (!config_test_all())
 	{
@@ -2747,6 +2743,21 @@ int	config_test_blocks()
 	int		errors = 0;
 	Hook *h;
 
+	invalid_snomasks_encountered = 0;
+
+	/* First, all the log { } blocks everywhere */
+	for (cfptr = conf; cfptr; cfptr = cfptr->next)
+	{
+		if (config_verbose > 1)
+			config_status("Testing %s", cfptr->filename);
+		/* First test and run the log { } blocks */
+		for (ce = cfptr->items; ce; ce = ce->next)
+		{
+			if (!strcmp(ce->name, "log"))
+				errors += config_test_log(cfptr, ce);
+		}
+	}
+
 	for (cfptr = conf; cfptr; cfptr = cfptr->next)
 	{
 		if (config_verbose > 1)
@@ -2773,7 +2784,8 @@ int	config_test_blocks()
 		{
 			/* These are already processed, so skip them here.. */
 			if (!strcmp(ce->name, "secret") ||
-			    !strcmp(ce->name, "set"))
+			    !strcmp(ce->name, "set") ||
+			    !strcmp(ce->name, "log"))
 			{
 				continue;
 			}
@@ -2834,6 +2846,12 @@ int	config_test_blocks()
 	if (errors > 0)
 	{
 		config_error("%i errors encountered", errors);
+	}
+
+	if (invalid_snomasks_encountered)
+	{
+		config_error("It seems your set::snomask-on-oper and/or oper::snomask needs to be updated. Are you perhaps upgrading from an older version to UnrealIRCd 6?");
+		config_error("See https://www.unrealircd.org/docs/Upgrading_from_5.x#Update_your_snomasks");
 	}
 
 	return (errors > 0 ? -1 : 1);
@@ -3107,25 +3125,29 @@ void init_dynconf(void)
 	memset(&tempiConf, 0, sizeof(iConf));
 }
 
-const char *pretty_time_val(long timeval)
+const char *pretty_time_val_r(char *buf, size_t buflen, long timeval)
 {
-	static char buf[512];
-
 	if (timeval == 0)
 		return "0";
 
 	buf[0] = 0;
 
 	if (timeval/86400)
-		snprintf(buf, sizeof(buf), "%ldd", timeval/86400);
+		snprintf(buf, buflen, "%ldd", timeval/86400);
 	if ((timeval/3600) % 24)
-		snprintf(buf+strlen(buf), sizeof(buf)-strlen(buf), "%ldh", (timeval/3600)%24);
+		snprintf(buf+strlen(buf), buflen-strlen(buf), "%ldh", (timeval/3600)%24);
 	if ((timeval/60)%60)
-		snprintf(buf+strlen(buf), sizeof(buf)-strlen(buf), "%ldm", (timeval/60)%60);
+		snprintf(buf+strlen(buf), buflen-strlen(buf), "%ldm", (timeval/60)%60);
 	if ((timeval%60))
-		snprintf(buf+strlen(buf), sizeof(buf)-strlen(buf), "%lds", timeval%60);
+		snprintf(buf+strlen(buf), buflen-strlen(buf), "%lds", timeval%60);
 
 	return buf;
+}
+
+const char *pretty_time_val(long timeval)
+{
+	static char buf[512];
+	return pretty_time_val_r(buf, sizeof(buf), timeval);
 }
 
 /* This converts a relative path to an absolute path, but only if necessary. */
@@ -3868,7 +3890,9 @@ int	_conf_oper(ConfigFile *conf, ConfigEntry *ce)
 	oper =  safe_alloc(sizeof(ConfigItem_oper));
 	safe_strdup(oper->name, ce->value);
 
-	oper->server_notice_colors = tempiConf.server_notice_colors; /* default */
+	/* Inherit some defaults: */
+	oper->server_notice_colors = tempiConf.server_notice_colors;
+	oper->server_notice_show_event = tempiConf.server_notice_show_event;
 
 	for (cep = ce->items; cep; cep = cep->next)
 	{
@@ -3915,6 +3939,10 @@ int	_conf_oper(ConfigFile *conf, ConfigEntry *ce)
 		else if (!strcmp(cep->name, "server-notice-colors"))
 		{
 			oper->server_notice_colors = config_checkval(cep->value, CFG_YESNO);
+		}
+		else if (!strcmp(cep->name, "server-notice-show-event"))
+		{
+			oper->server_notice_show_event = config_checkval(cep->value, CFG_YESNO);
 		}
 		else if (!strcmp(cep->name, "modes"))
 		{
@@ -4029,15 +4057,26 @@ int	_test_oper(ConfigFile *conf, ConfigEntry *ce)
 			/* oper::snomask */
 			else if (!strcmp(cep->name, "snomask"))
 			{
+				char *wrong_snomask;
 				if (has_snomask)
 				{
 					config_warn_duplicate(cep->file->filename,
 						cep->line_number, "oper::snomask");
 					continue;
 				}
+				if (!is_valid_snomask_string_testing(cep->value, &wrong_snomask))
+				{
+					config_error("%s:%i: oper::snomask contains unknown snomask letter(s) '%s'",
+					             cep->file->filename, cep->line_number, wrong_snomask);
+					errors++;
+					invalid_snomasks_encountered++;
+				}
 				has_snomask = 1;
 			}
 			else if (!strcmp(cep->name, "server-notice-colors"))
+			{
+			}
+			else if (!strcmp(cep->name, "server-notice-show-event"))
 			{
 			}
 			/* oper::modes */
@@ -7138,6 +7177,9 @@ int	_conf_set(ConfigFile *conf, ConfigEntry *ce)
 		else if (!strcmp(cep->name, "server-notice-colors")) {
 			tempiConf.server_notice_colors = config_checkval(cep->value, CFG_YESNO);
 		}
+		else if (!strcmp(cep->name, "server-notice-show-event")) {
+			tempiConf.server_notice_show_event = config_checkval(cep->value, CFG_YESNO);
+		}
 		else if (!strcmp(cep->name, "level-on-join")) {
 			const char *res = channellevel_to_string(cep->value); /* 'halfop', etc */
 			if (!res)
@@ -7804,10 +7846,21 @@ int	_test_set(ConfigFile *conf, ConfigEntry *ce)
 			set_usermode(cep->value);
 		}
 		else if (!strcmp(cep->name, "snomask-on-oper")) {
+			char *wrong_snomask;
 			CheckNull(cep);
 			CheckDuplicate(cep, snomask_on_oper, "snomask-on-oper");
+			if (!is_valid_snomask_string_testing(cep->value, &wrong_snomask))
+			{
+				config_error("%s:%i: set::snomask-on-oper contains unknown snomask letter(s) '%s'",
+					     cep->file->filename, cep->line_number, wrong_snomask);
+				errors++;
+				invalid_snomasks_encountered++;
+			}
 		}
 		else if (!strcmp(cep->name, "server-notice-colors")) {
+			CheckNull(cep);
+		}
+		else if (!strcmp(cep->name, "server-notice-show-event")) {
 			CheckNull(cep);
 		}
 		else if (!strcmp(cep->name, "level-on-join")) {
