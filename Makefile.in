@@ -185,6 +185,7 @@ install: all
 	$(INSTALL) -m 0700 -d $(DESTDIR)@CONFDIR@
 	$(INSTALL) -m 0600 doc/conf/*.default.conf $(DESTDIR)@CONFDIR@
 	$(INSTALL) -m 0600 doc/conf/*.optional.conf $(DESTDIR)@CONFDIR@
+	$(INSTALL) -m 0600 doc/conf/*.piss.conf $(DESTDIR)@CONFDIR@
 	-@if [ ! -f "$(DESTDIR)@CONFDIR@/modules.sources.list" ] ; then \
 		$(INSTALL) -m 0600 doc/conf/modules.sources.list $(DESTDIR)@CONFDIR@ ; \
 	fi
