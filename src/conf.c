@@ -199,8 +199,8 @@ void free_tls_options(TLSOptions *tlsoptions);
  * Config parser (IRCd)
 */
 int			config_read_file(const char *filename, const char *display_name);
-void			config_rehash();
-int			config_run_blocks();
+void			config_rehash(void);
+int			config_run_blocks(void);
 int	config_test_blocks();
 
 /*
@@ -464,10 +464,15 @@ int config_parse_flood_generic(const char *str, Configuration *conf, char *block
 
 long config_checkval(const char *orig, unsigned short flags)
 {
-	char *value = raw_strdup(orig);
+	char *value;
 	char *text;
 	long ret = 0;
 
+	/* Handle empty strings early, since we use +1 later in the code etc. */
+	if (BadPtr(orig))
+		return 0;
+
+	value = raw_strdup(orig);
 	if (flags == CFG_YESNO) {
 		for (text = value; *text; text++) {
 			if (!isalnum(*text))
@@ -1586,7 +1591,7 @@ ConfigCommand *config_binary_search(const char *cmd) {
 	return NULL;
 }
 
-void	free_iConf(Configuration *i)
+void free_iConf(Configuration *i)
 {
 	FloodSettings *f, *f_next;
 
@@ -1695,6 +1700,7 @@ void config_setdefaultsettings(Configuration *i)
 	/* - known-users */
 	config_parse_flood_generic("3:60", i, "known-users", FLD_NICK); /* NICK flood protection: max 3 per 60s */
 	config_parse_flood_generic("3:90", i, "known-users", FLD_JOIN); /* JOIN flood protection: max 3 per 90s */
+	config_parse_flood_generic("3:90", i, "known-users", FLD_VHOST); /* MODE -x flood protection: max 3 per 90s */
 	config_parse_flood_generic("4:120", i, "known-users", FLD_AWAY); /* AWAY flood protection: max 4 per 120s */
 	config_parse_flood_generic("4:60", i, "known-users", FLD_INVITE); /* INVITE flood protection: max 4 per 60s */
 	config_parse_flood_generic("4:120", i, "known-users", FLD_KNOCK); /* KNOCK protection: max 4 per 120s */
@@ -1703,6 +1709,7 @@ void config_setdefaultsettings(Configuration *i)
 	/* - unknown-users */
 	config_parse_flood_generic("2:60", i, "unknown-users", FLD_NICK); /* NICK flood protection: max 2 per 60s */
 	config_parse_flood_generic("2:90", i, "unknown-users", FLD_JOIN); /* JOIN flood protection: max 2 per 90s */
+	config_parse_flood_generic("2:90", i, "unknown-users", FLD_VHOST); /* MODE -x flood protection: max 2 per 90s */
 	config_parse_flood_generic("4:120", i, "unknown-users", FLD_AWAY); /* AWAY flood protection: max 4 per 120s */
 	config_parse_flood_generic("2:60", i, "unknown-users", FLD_INVITE); /* INVITE flood protection: max 2 per 60s */
 	config_parse_flood_generic("2:120", i, "unknown-users", FLD_KNOCK); /* KNOCK protection: max 2 per 120s */
@@ -2412,7 +2419,8 @@ void config_rehash()
 	}
 	for (listen_ptr = conf_listen; listen_ptr; listen_ptr = listen_ptr->next)
 	{
-		listen_ptr->flag.temporary = 1;
+		if (!(listen_ptr->options & LISTENER_CONTROL))
+			listen_ptr->flag.temporary = 1;
 	}
 	for (tld_ptr = conf_tld; tld_ptr; tld_ptr = (ConfigItem_tld *) next)
 	{
@@ -2643,152 +2651,87 @@ void config_switchover(void)
 	log_blocks_switchover();
 }
 
-int	config_run_blocks()
+/** Priority of config blocks during CONFIG_TEST stage */
+static const char *config_test_priority_blocks[] =
+{
+	"me",
+	"secret",
+	"log", /* "log" needs to be before "set" in CONFIG_TEST */
+	"set",
+	"class",
+};
+
+/** Priority of config blocks during CONFIG_RUN stage */
+static const char *config_run_priority_blocks[] =
+{
+	"me",
+	"secret",
+	"set",
+	"log", /* "log" needs to be after "set" in CONFIG_RUN */
+	"class",
+};
+
+int config_test_blocks()
 {
 	ConfigEntry 	*ce;
 	ConfigFile	*cfptr;
 	ConfigCommand	*cc;
 	int		errors = 0;
+	int i;
 	Hook *h;
-	ConfigItem_allow *allow;
 
-	/* Stage 1: set block first */
-	for (cfptr = conf; cfptr; cfptr = cfptr->next)
+	invalid_snomasks_encountered = 0;
+
+	/* Stage 1: first the priority blocks, in the order as specified
+	 *          in config_test_priority_blocks[]
+	 */
+	for (i=0; i < ARRAY_SIZEOF(config_test_priority_blocks); i++)
 	{
-		if (config_verbose > 1)
-			config_status("Running %s", cfptr->filename);
-		for (ce = cfptr->items; ce; ce = ce->next)
+		const char *config_block = config_test_priority_blocks[i];
+		cc = config_binary_search(config_block);
+		if (!cc)
+			abort(); /* internal fuckup */
+		for (cfptr = conf; cfptr; cfptr = cfptr->next)
 		{
-			if (!strcmp(ce->name, "set"))
+			if (config_verbose > 1)
+				config_status("Running %s", cfptr->filename);
+			for (ce = cfptr->items; ce; ce = ce->next)
 			{
-				if (_conf_set(cfptr, ce) < 0)
-					errors++;
-			}
-		}
-	}
-
-	/* Stage 2: now class blocks */
-	for (cfptr = conf; cfptr; cfptr = cfptr->next)
-	{
-		if (config_verbose > 1)
-			config_status("Running %s", cfptr->filename);
-		for (ce = cfptr->items; ce; ce = ce->next)
-		{
-			if (!strcmp(ce->name, "class"))
-			{
-				if (_conf_class(cfptr, ce) < 0)
-					errors++;
-			}
-		}
-	}
-
-	/* Stage 3: now all the rest */
-	for (cfptr = conf; cfptr; cfptr = cfptr->next)
-	{
-		if (config_verbose > 1)
-			config_status("Running %s", cfptr->filename);
-		for (ce = cfptr->items; ce; ce = ce->next)
-		{
-			/* These are already processed above (set, class)
-			 * or via config_test_blocks() (secret).
-			 */
-			if (!strcmp(ce->name, "set") ||
-			    !strcmp(ce->name, "class") ||
-			    !strcmp(ce->name, "secret"))
-			{
-				continue;
-			}
-
-			if ((cc = config_binary_search(ce->name))) {
-				if ((cc->conffunc) && (cc->conffunc(cfptr, ce) < 0))
-					errors++;
-			}
-			else
-			{
-				int value;
-				for (h = Hooks[HOOKTYPE_CONFIGRUN]; h; h = h->next)
+				if (!strcmp(ce->name, config_block))
 				{
-					value = (*(h->func.intfunc))(cfptr,ce,CONFIG_MAIN);
-					if (value == 1)
-						break;
+					int n = cc->testfunc(cfptr, ce);
+					errors += n;
+					if (!strcmp(config_block, "secret") && (n == 0))
+					{
+						/* Yeah special case: secret { } blocks we run
+						 * immediately here.
+						 */
+						_conf_secret(cfptr, ce);
+					}
 				}
 			}
 		}
 	}
 
-	close_unbound_listeners();
-	listen_cleanup();
-	close_unbound_listeners();
-	loop.do_bancheck = 1;
-	config_switchover();
-	update_throttling_timer_settings();
-
-	/* initialize conf_files with defaults if the block isn't set: */
-	if (!conf_files)
-	  _conf_files(NULL, NULL);
-
-	if (errors > 0)
-	{
-		config_error("%i fatal errors encountered", errors);
-	}
-	return (errors > 0 ? -1 : 1);
-}
-
-
-int	config_test_blocks()
-{
-	ConfigEntry 	*ce;
-	ConfigFile	*cfptr;
-	ConfigCommand	*cc;
-	int		errors = 0;
-	Hook *h;
-
-	invalid_snomasks_encountered = 0;
-
-	/* First, all the log { } blocks everywhere */
+	/* Stage 2: now all the other config blocks */
 	for (cfptr = conf; cfptr; cfptr = cfptr->next)
 	{
 		if (config_verbose > 1)
-			config_status("Testing %s", cfptr->filename);
-		/* First test and run the log { } blocks */
+			config_status("Running %s", cfptr->filename);
 		for (ce = cfptr->items; ce; ce = ce->next)
 		{
-			if (!strcmp(ce->name, "log"))
-				errors += config_test_log(cfptr, ce);
-		}
-	}
-
-	for (cfptr = conf; cfptr; cfptr = cfptr->next)
-	{
-		if (config_verbose > 1)
-			config_status("Testing %s", cfptr->filename);
-		/* First test and run the secret { } blocks */
-		for (ce = cfptr->items; ce; ce = ce->next)
-		{
-			if (!strcmp(ce->name, "secret"))
+			char skip = 0;
+			for (i=0; i < ARRAY_SIZEOF(config_test_priority_blocks); i++)
 			{
-				int n = _test_secret(cfptr, ce);
-				errors += n;
-				if (n == 0)
-					_conf_secret(cfptr, ce);
+				if (!strcmp(ce->name, config_test_priority_blocks[i]))
+				{
+					skip = 1;
+					break;
+				}
 			}
-		}
-		/* First test the set { } block */
-		for (ce = cfptr->items; ce; ce = ce->next)
-		{
-			if (!strcmp(ce->name, "set"))
-				errors += _test_set(cfptr, ce);
-		}
-		/* Now test all the rest */
-		for (ce = cfptr->items; ce; ce = ce->next)
-		{
-			/* These are already processed, so skip them here.. */
-			if (!strcmp(ce->name, "secret") ||
-			    !strcmp(ce->name, "set") ||
-			    !strcmp(ce->name, "log"))
-			{
+			if (skip)
 				continue;
-			}
+
 			if ((cc = config_binary_search(ce->name))) {
 				if (cc->testfunc)
 					errors += (cc->testfunc(cfptr, ce));
@@ -2842,7 +2785,9 @@ int	config_test_blocks()
 			}
 		}
 	}
+
 	errors += config_post_test();
+
 	if (errors > 0)
 	{
 		config_error("%i errors encountered", errors);
@@ -2854,6 +2799,96 @@ int	config_test_blocks()
 		config_error("See https://www.unrealircd.org/docs/Upgrading_from_5.x#Update_your_snomasks");
 	}
 
+	return (errors > 0 ? -1 : 1);
+}
+
+int config_run_blocks(void)
+{
+	ConfigEntry 	*ce;
+	ConfigFile	*cfptr;
+	ConfigCommand	*cc;
+	int		errors = 0;
+	int i;
+	Hook *h;
+	ConfigItem_allow *allow;
+
+	/* Stage 1: first the priority blocks, in the order as specified
+	 *          in config_run_priority_blocks[]
+	 */
+	for (i=0; i < ARRAY_SIZEOF(config_run_priority_blocks); i++)
+	{
+		const char *config_block = config_run_priority_blocks[i];
+		cc = config_binary_search(config_block);
+		if (!cc)
+			abort(); /* internal fuckup */
+		if (!strcmp(config_block, "secret"))
+			continue; /* yeah special case, we already processed the run part in test for these */
+		for (cfptr = conf; cfptr; cfptr = cfptr->next)
+		{
+			if (config_verbose > 1)
+				config_status("Running %s", cfptr->filename);
+			for (ce = cfptr->items; ce; ce = ce->next)
+			{
+				if (!strcmp(ce->name, config_block))
+				{
+					if (cc->conffunc(cfptr, ce) < 0)
+						errors++;
+				}
+			}
+		}
+	}
+
+	/* Stage 2: now all the other config blocks */
+	for (cfptr = conf; cfptr; cfptr = cfptr->next)
+	{
+		if (config_verbose > 1)
+			config_status("Running %s", cfptr->filename);
+		for (ce = cfptr->items; ce; ce = ce->next)
+		{
+			char skip = 0;
+			for (i=0; i < ARRAY_SIZEOF(config_run_priority_blocks); i++)
+			{
+				if (!strcmp(ce->name, config_run_priority_blocks[i]))
+				{
+					skip = 1;
+					break;
+				}
+			}
+			if (skip)
+				continue;
+
+			if ((cc = config_binary_search(ce->name))) {
+				if ((cc->conffunc) && (cc->conffunc(cfptr, ce) < 0))
+					errors++;
+			}
+			else
+			{
+				int value;
+				for (h = Hooks[HOOKTYPE_CONFIGRUN]; h; h = h->next)
+				{
+					value = (*(h->func.intfunc))(cfptr,ce,CONFIG_MAIN);
+					if (value == 1)
+						break;
+				}
+			}
+		}
+	}
+
+	close_unbound_listeners();
+	listen_cleanup();
+	close_unbound_listeners();
+	loop.do_bancheck = 1;
+	config_switchover();
+	update_throttling_timer_settings();
+
+	/* initialize conf_files with defaults if the block isn't set: */
+	if (!conf_files)
+	  _conf_files(NULL, NULL);
+
+	if (errors > 0)
+	{
+		config_error("%i fatal errors encountered", errors);
+	}
 	return (errors > 0 ? -1 : 1);
 }
 
@@ -2945,7 +2980,9 @@ ConfigItem_listen *find_listen(const char *ipmask, int port, SocketType socket_t
 
 	for (e = conf_listen; e; e = e->next)
 	{
-		if (socket_type == SOCKET_TYPE_UNIX)
+		if (e->socket_type != socket_type)
+			continue;
+		if (e->socket_type == SOCKET_TYPE_UNIX)
 		{
 			if (!strcmp(e->file, ipmask))
 				return e;
@@ -7453,6 +7490,10 @@ int	_conf_set(ConfigFile *conf, ConfigEntry *ce)
 					{
 						config_parse_flood_generic(ceppp->value, &tempiConf, cepp->name, FLD_NICK);
 					}
+					else if (!strcmp(ceppp->name, "vhost-flood"))
+					{
+						config_parse_flood_generic(ceppp->value, &tempiConf, cepp->name, FLD_VHOST);
+					}
 					else if (!strcmp(ceppp->name, "join-flood"))
 					{
 						config_parse_flood_generic(ceppp->value, &tempiConf, cepp->name, FLD_JOIN);
@@ -8416,6 +8457,19 @@ int	_test_set(ConfigFile *conf, ConfigEntry *ce)
 							errors++;
 						}
 					}
+					else if (!strcmp(ceppp->name, "vhost-flood"))
+					{
+						int cnt, period;
+						CheckNull(ceppp);
+						if (!config_parse_flood(ceppp->value, &cnt, &period) ||
+						    (cnt < 1) || (cnt > 255) || (period < 5))
+						{
+							config_error("%s:%i: set::anti-flood::vhost-flood error. Syntax is '<count>:<period>' (eg 5:60), "
+								     "count should be 1-255, period should be greater than 4",
+								ceppp->file->filename, ceppp->line_number);
+							errors++;
+						}
+					}
 					else if (!strcmp(ceppp->name, "join-flood"))
 					{
 						int cnt, period;
@@ -9352,6 +9406,7 @@ void config_run(void)
 {
 	extcmodes_check_for_changes();
 	start_listeners();
+	add_proc_io_server();
 	free_all_config_resources();
 }
 
@@ -10624,13 +10679,16 @@ void request_rehash(Client *client)
 
 int rehash_internal(Client *client)
 {
+	int failure;
+
 	/* Log it here if it is by a signal */
 	if (client == NULL)
 		unreal_log(ULOG_INFO, "config", "CONFIG_RELOAD", client, "Rehashing server configuration file [./unrealircd rehash]");
 
-	loop.rehashing = 1; /* double checking.. */
+	loop.rehashing = 2; /* now doing the actual rehash */
 
-	if (config_test() == 0)
+	failure = config_test();
+	if (failure == 0)
 		config_run();
 	/* TODO: uh.. are we supposed to do all this for a failed rehash too? maybe some but not all? */
 	reread_motdsandrules();
@@ -10641,8 +10699,11 @@ int rehash_internal(Client *client)
 	// unload_all_unused_moddata(); -- this will crash
 	umodes_check_for_changes();
 	charsys_check_for_changes();
+
+	/* Clear everything now that we are done */
 	loop.rehashing = 0;
 	remote_rehash_client = NULL;
+	procio_post_rehash(failure);
 	return 1;
 }
 

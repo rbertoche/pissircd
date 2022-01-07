@@ -7,7 +7,7 @@ dnl src/windows/unrealinst.iss
 dnl doc/Config.header
 dnl src/version.c.SH
 
-AC_INIT([unrealircd], [6.0.2-git], [https://bugs.unrealircd.org/], [], [https://unrealircd.org/])
+AC_INIT([unrealircd], [6.0.2-rc1], [https://bugs.unrealircd.org/], [], [https://unrealircd.org/])
 AC_CONFIG_SRCDIR([src/ircd.c])
 AC_CONFIG_HEADER([include/setup.h])
 AC_CONFIG_AUX_DIR([autoconf])
@@ -40,7 +40,7 @@ AC_DEFINE_UNQUOTED([UNREAL_VERSION_MINOR], [$UNREAL_VERSION_MINOR], [Minor versi
 # The version suffix such as a beta marker or release candidate
 # marker. (e.g.: -rcX for unrealircd-3.2.9-rcX). This macro is a
 # string instead of an integer because it contains arbitrary data.
-UNREAL_VERSION_SUFFIX=["-git"]
+UNREAL_VERSION_SUFFIX=["-rc1"]
 AC_DEFINE_UNQUOTED([UNREAL_VERSION_SUFFIX], ["$UNREAL_VERSION_SUFFIX"], [Version suffix such as a beta marker or release candidate marker. (e.g.: -rcX for unrealircd-3.2.9-rcX)])
 
 AC_PATH_PROG(RM,rm)
@@ -484,6 +484,12 @@ AC_ARG_WITH(pidfile, [AS_HELP_STRING([--with-pidfile=path],[Specify the path of 
 	[AC_DEFINE_UNQUOTED([PIDFILE], ["$HOME/unrealircd/data/unrealircd.pid"], [Define the path of the pid file])
 		PIDFILE="$HOME/unrealircd/data/unrealircd.pid"])
 
+AC_ARG_WITH(controlfile, [AS_HELP_STRING([--with-controlfile=path],[Specify the path of the control socket])],
+	[AC_DEFINE_UNQUOTED([CONTROLFILE], ["$withval"], [Define the path of the control socket])
+		CONTROLFILE="$withval"],
+	[AC_DEFINE_UNQUOTED([CONTROLFILE], ["$HOME/unrealircd/data/unrealircd.ctl"], [Define the path of the control socket])
+		CONTROLFILE="$HOME/unrealircd/data/unrealircd.ctl"])
+
 dnl Ensure that this “feature” can be disabled as it makes it harder to package unrealircd.
 dnl Users have always been able to specify “./configure LDFLAGS=-Wl,-rpath,/path/to/blah”—binki
 AC_ARG_WITH(privatelibdir, [AS_HELP_STRING([--with-privatelibdir=path],[Specify the directory where private libraries are stored. Disable when building a package for a distro])],
@@ -514,6 +520,7 @@ dnl well, Because DATADIR conflicts with the Windows SDK header files.. amazing.
 AC_SUBST(PERMDATADIR)
 AC_SUBST(DOCDIR)
 AC_SUBST(PIDFILE)
+AC_SUBST(CONTROLFILE)
 AC_SUBST(LDFLAGS_PRIVATELIBS)
 
 AC_ARG_WITH(maxconnections, [AS_HELP_STRING([--with-maxconnections=size], [Specify the max file descriptors to use])],
@@ -571,12 +578,12 @@ export PATH_SEPARATOR
 dnl Use system pcre2 when available, unless --without-system-pcre2.
 has_system_pcre2="no"
 AS_IF([test "x$with_system_pcre2" = "xyes"],[
-PKG_CHECK_MODULES([PCRE2], libpcre2-8 >= 10.00,[has_system_pcre2=yes
+PKG_CHECK_MODULES([PCRE2], libpcre2-8 >= 10.34,[has_system_pcre2=yes
 AS_IF([test "x$PRIVATELIBDIR" != "x"], [rm -f "$PRIVATELIBDIR/"libpcre2*])],[has_system_pcre2=no])])
 
 AS_IF([test "$has_system_pcre2" = "no"], [
 dnl REMEMBER TO CHANGE WITH A NEW PCRE2 RELEASE!
-pcre2_version="10.36"
+pcre2_version="10.39"
 AC_MSG_RESULT(extracting PCRE2 regex library)
 cur_dir=`pwd`
 cd extras
@@ -593,7 +600,7 @@ else
 fi
 AC_MSG_RESULT(configuring PCRE2 regex library)
 cd pcre2-$pcre2_version
-./configure --enable-jit --enable-shared --disable-unicode --prefix=$cur_dir/extras/pcre2 --libdir=$PRIVATELIBDIR || exit 1
+./configure --enable-jit --enable-shared --prefix=$cur_dir/extras/pcre2 --libdir=$PRIVATELIBDIR || exit 1
 AC_MSG_RESULT(compiling PCRE2 regex library)
 $ac_cv_prog_MAKER || exit 1
 AC_MSG_RESULT(installing PCRE2 regex library)
@@ -717,7 +724,7 @@ AS_IF([test "$has_system_cares" = "no"], [
 dnl REMEMBER TO CHANGE WITH A NEW C-ARES RELEASE!
 dnl NOTE: when changing this here, ALSO change it in extras/curlinstall
 dnl       and in the comment in this file around line 400!
-cares_version="1.17.2"
+cares_version="1.18.1"
 AC_MSG_RESULT(extracting c-ares resolver library)
 cur_dir=`pwd`
 cd extras

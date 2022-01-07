@@ -28,6 +28,34 @@
 #include "setup.h"
 #include "fdlist.h"
 
+extern int dorehash, dorestart, doreloadcert;
+#ifndef _WIN32
+extern char **myargv;
+#else
+extern LPCSTR cmdLine;
+#endif
+/* Externals */
+extern MODVAR char *buildid;
+extern MODVAR char backupbuf[8192];
+extern EVENT(unrealdns_removeoldrecords);
+extern EVENT(unrealdb_expire_secret_cache);
+extern void init_glines(void);
+extern void tkl_init(void);
+extern void process_clients(void);
+extern void unrealdb_test(void);
+extern void ignore_this_signal();
+extern void s_rehash();
+extern void s_reloadcert();
+extern void s_restart();
+extern void s_die();
+#ifndef _WIN32
+// nix specific
+extern char unreallogo[];
+#else
+// windows specific
+extern SERVICE_STATUS_HANDLE IRCDStatusHandle;
+extern SERVICE_STATUS IRCDStatus;
+#endif
 extern MODVAR char *extraflags;
 extern MODVAR int tainted;
 extern MODVAR Member *freemember;
@@ -153,6 +181,7 @@ extern MODVAR struct list_head lclient_list;
 extern MODVAR struct list_head server_list;
 extern MODVAR struct list_head oper_list;
 extern MODVAR struct list_head unknown_list;
+extern MODVAR struct list_head control_list;
 extern MODVAR struct list_head global_server_list;
 extern MODVAR struct list_head dead_list;
 extern RealCommand *find_command(const char *cmd, int flags);
@@ -663,7 +692,6 @@ extern int spamfilter_getconftargets(const char *s);
 extern void remove_all_snomasks(Client *client);
 extern void remove_oper_modes(Client *client);
 extern char *spamfilter_inttostring_long(int v);
-extern MODVAR char backupbuf[];
 extern int is_invited(Client *client, Channel *channel);
 extern void channel_modes(Client *client, char *mbuf, char *pbuf, size_t mbuf_size, size_t pbuf_size, Channel *channel, int hide_local_modes);
 extern int op_can_override(const char *acl, Client *client,Channel *channel,void* extra);
@@ -920,6 +948,10 @@ extern int unreal_bind(int fd, const char *ip, int port, SocketType socket_type)
 extern int unreal_connect(int fd, const char *ip, int port, int ipv6);
 extern int is_valid_ip(const char *str);
 extern int ipv6_capable(void);
+extern int unix_sockets_capable(void);
+#ifdef _WIN32
+extern void init_winsock(void);
+#endif
 extern MODVAR Client *remote_rehash_client;
 extern MODVAR int debugfd;
 extern void convert_to_absolute_path(char **path, const char *reldir);
@@ -930,7 +962,7 @@ extern Cmode_t get_extmode_bitbychar(char m);
 extern long find_user_mode(char mode);
 extern void start_listeners(void);
 extern void buildvarstring(const char *inbuf, char *outbuf, size_t len, const char *name[], const char *value[]);
-extern void reinit_tls(void);
+extern int reinit_tls(void);
 extern CMD_FUNC(cmd_error);
 extern CMD_FUNC(cmd_dns);
 extern CMD_FUNC(cmd_info);
@@ -1136,6 +1168,8 @@ extern void flood_limit_exceeded_log(Client *client, const char *floodname);
 /* logging */
 extern int config_test_log(ConfigFile *conf, ConfigEntry *ce);
 extern int config_run_log(ConfigFile *conf, ConfigEntry *ce);
+extern const char *log_level_terminal_color(LogLevel loglevel);
+#define TERMINAL_COLOR_RESET "\033[0m"
 extern LogType log_type_stringtoval(const char *str);
 extern const char *log_type_valtostring(LogType v);
 #ifdef DEBUGMODE
@@ -1209,3 +1243,8 @@ extern void make_umodestr(void);
 extern void initwhowas(void);
 extern void uid_init(void);
 extern const char *uid_get(void);
+/* proc i/o */
+extern void add_proc_io_server(void);
+extern void procio_post_rehash(int failure);
+/* end of proc i/o */
+extern int minimum_msec_since_last_run(struct timeval *tv_old, long minimum);

@@ -33,6 +33,7 @@
 #define CACHEDIR "cache"
 #define TMPDIR "tmp"
 #define PIDFILE PERMDATADIR"/unrealircd.pid"
+#define CONTROLFILE PERMDATADIR"/unrealircd.ctl"
 #define NO_U_TYPES
 #define NEED_U_INT32_T
 #define strcasecmp _stricmp
@@ -65,6 +66,6 @@
 
 /* Version suffix such as a beta marker or release candidate marker. (e.g.:
    -rcX for unrealircd-3.2.9-rcX) */
-#define UNREAL_VERSION_SUFFIX "-git"
+#define UNREAL_VERSION_SUFFIX "-rc1"
 
 #endif
