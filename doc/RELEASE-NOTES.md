@@ -1,12 +1,32 @@
+UnrealIRCd 6.0.3-git
+=====================
+
+This is work in progress!
+
+If you are already running UnrealIRCd 6 then read below. Otherwise, jump
+straight to the [summary about UnrealIRCd 6](#Summary) to learn more
+about UnrealIRCd 6.
+
+Fixes:
+* A `REHASH` with certain remote includes setups could cause a crash or
+  other weird and confusing problems such as complaining about unable
+  to open an ipv6-database or missing snomask configuration.
+  This only affected some people with remote includes, not all.
+
+Enhancements:
+* The default text log format on disk changed. It now includes the server
+  name where the event was generated. Without this, it is sometimes
+  difficult to trace problems since previously it sometimes looked like
+  there was a problem on your server when it was actually another server
+  on the network.
+  * Old log format: `[DATE TIME] subsystem.EVENT_ID loglevel: ........`
+  * New log format: `[DATE TIME] servername subsystem.EVENT_ID loglevel: ........`
+
 UnrealIRCd 6.0.2
-=================
+-----------------
 UnrealIRCd 6.0.2 comes with several nice feature enhancements along with
 some fixes. It also includes a fix for a crash bug that can be triggered
 by ordinary users.
-
-If you are already running UnrealIRCd 6 then read below on the fixes
-and nice new features in 6.0.2. Otherwise, jump straight to the
-[summary about UnrealIRCd 6](#Summary) to learn more about UnrealIRCd 6.
 
 Fixes:
 * Fix crash that can be triggered by regular users if you have any `deny dcc`
